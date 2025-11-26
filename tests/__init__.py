@@ -1,0 +1,1 @@
+"""NecroStack test suite."""
