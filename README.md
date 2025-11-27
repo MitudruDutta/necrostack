@@ -1,6 +1,6 @@
 # NecroStack
 
-A minimal, async-first event-driven micro-framework for Python 3.11+, designed for building reactive, composable systems with formal guarantees on event flow and processing semantics.
+A minimal, async-first event-driven micro-framework for Python, designed for building reactive, composable systems with formal guarantees on event flow and processing semantics.
 
 ## Abstract
 
