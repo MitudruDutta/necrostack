@@ -27,7 +27,7 @@
     - Configure `extra="forbid"` and `frozen=True`
     - Add `field_validator` ensuring `event_type` is non-empty and not whitespace-only
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
-
+  
 - [x] 3. Implement Organ base class
   - [x] 3.1 Create Organ ABC with handle method
     - Implement `necrostack/core/organ.py` with `Organ(ABC)`
@@ -73,35 +73,35 @@
     - _Requirements: 3.7_
     - _Supports: Error-handling behavior from Design Document, structured logging_
 
-- [ ] 6. Checkpoint - Verify core implementation works
+- [x] 6. Checkpoint - Verify core implementation works
   - Run sample code manually to verify Event, Organ, Backend, Spine work together
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 7. Write property tests for Event model
-  - [ ] 7.1 Write property test for Event serialization round-trip
+- [x] 7. Write property tests for Event model
+  - [x] 7.1 Write property test for Event serialization round-trip
     - **Property 1: Event Serialization Round-Trip**
     - **Validates: Requirements 1.6, 1.7**
-  - [ ] 7.2 Write property test for Event ID uniqueness
+  - [x] 7.2 Write property test for Event ID uniqueness
     - **Property 2: Event ID Uniqueness**
     - **Validates: Requirements 1.2**
-  - [ ] 7.3 Write property test for empty event_type rejection
+  - [x] 7.3 Write property test for empty event_type rejection
     - **Property 3: Empty Event Type Rejection**
     - **Validates: Requirements 1.4**
-  - [ ] 7.4 Write property test for unknown field rejection
+  - [x] 7.4 Write property test for unknown field rejection
     - **Property 4: Unknown Field Rejection**
     - **Validates: Requirements 1.5**
 
-- [ ] 8. Write property tests for Organ and Backend
-  - [ ] 8.1 Write property test for Organ name defaulting
+- [x] 8. Write property tests for Organ and Backend
+  - [x] 8.1 Write property test for Organ name defaulting
     - **Property 5: Organ Name Defaulting**
     - **Validates: Requirements 2.4**
-  - [ ] 8.2 Write property test for Backend FIFO ordering
+  - [x] 8.2 Write property test for Backend FIFO ordering
     - **Property 11: Backend FIFO Ordering**
     - **Validates: Requirements 5.2**
-  - [ ] 8.3 Write property test for Backend pull timeout
+  - [x] 8.3 Write property test for Backend pull timeout
     - **Property 12: Backend Pull Timeout**
     - **Validates: Requirements 5.3**
-  - [ ] 8.4 Write smoke test for structured logging output shape
+  - [x] 8.4 Write smoke test for structured logging output shape
     - Dispatch an event through Spine using InMemoryBackend with at least one async handler
     - Capture logs via `caplog` or custom handler
     - Verify logs contain required fields (event_id, event_type, organ) for one dispatch
