@@ -60,7 +60,13 @@ async def run_seance(
     )
 
     # Run the séance
-    await spine.run(start_event)
+    try:
+        result = await spine.run(start_event)
+        if result is not None:
+            print(f"Séance completed with result: {result}")
+    except Exception as e:
+        print(f"Error during séance: {e}")
+        raise
 
 
 def main() -> None:

@@ -10,6 +10,7 @@ Usage:
 """
 
 import asyncio
+from typing import Callable, Optional
 
 from necrostack.backends.inmemory import InMemoryBackend
 from necrostack.core.event import Event
@@ -41,7 +42,7 @@ Jack,33,72000,Sales
 async def run_etl(
     csv_data: str = SAMPLE_CSV_DATA,
     source_name: str = "employees.csv",
-    output_callback: callable = None,
+    output_callback: Optional[Callable[[str], None]] = None,
 ) -> ExportSummary:
     """Run a complete ETL pipeline.
 

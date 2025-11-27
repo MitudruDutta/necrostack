@@ -21,8 +21,9 @@ class AskQuestion(Organ):
         spirit_name = event.payload.get("spirit_name", "Unknown Spirit")
         question = event.payload.get("question", "What wisdom do you bring?")
 
-        # Generate a mystical answer
-        answer = f"The {spirit_name} speaks: 'The path you seek lies within shadows and light.'"
+        # TODO: Replace with actual QA/generative function to produce dynamic answers.
+        # Currently a placeholder that incorporates the question into the response.
+        answer = f"The {spirit_name} speaks in response to '{question}': 'The path you seek lies within shadows and light.'"
 
         return Event(
             event_type="ANSWER_GENERATED",

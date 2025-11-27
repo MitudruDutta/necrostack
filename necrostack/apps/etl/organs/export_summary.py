@@ -1,5 +1,7 @@
 """ExportSummary organ: DATA_TRANSFORMED → print summary."""
 
+from typing import Callable, Optional
+
 from necrostack.core.event import Event
 from necrostack.core.organ import Organ
 
@@ -12,7 +14,7 @@ class ExportSummary(Organ):
 
     listens_to = ["DATA_TRANSFORMED"]
 
-    def __init__(self, name: str | None = None, output_callback: callable = None):
+    def __init__(self, name: str | None = None, output_callback: Optional[Callable[[str], None]] = None):
         """Initialize the ExportSummary organ.
 
         Args:
@@ -46,9 +48,25 @@ class ExportSummary(Organ):
         if numeric_stats:
             summary_lines.append("\nNumeric Statistics:")
             for field, stats in numeric_stats.items():
+                if not isinstance(stats, dict):
+                    continue
+                
+                # Extract and validate each stat value
+                stat_values = {}
+                for key in ('min', 'max', 'avg', 'sum'):
+                    val = stats.get(key)
+                    if isinstance(val, (int, float)):
+                        stat_values[key] = f"{val:.2f}"
+                    else:
+                        # Try to coerce to float, otherwise use placeholder
+                        try:
+                            stat_values[key] = f"{float(val):.2f}"
+                        except (TypeError, ValueError):
+                            stat_values[key] = "N/A"
+                
                 summary_lines.append(
-                    f"  {field}: min={stats['min']:.2f}, max={stats['max']:.2f}, "
-                    f"avg={stats['avg']:.2f}, sum={stats['sum']:.2f}"
+                    f"  {field}: min={stat_values['min']}, max={stat_values['max']}, "
+                    f"avg={stat_values['avg']}, sum={stat_values['sum']}"
                 )
 
         summary = "\n".join(summary_lines)
@@ -58,5 +76,3 @@ class ExportSummary(Organ):
             self.output_callback(summary)
         else:
             print(summary)
-
-        return None

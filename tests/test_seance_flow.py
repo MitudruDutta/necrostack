@@ -39,7 +39,7 @@ class StoppingBackend:
                 self._spine_ref[0].stop()
             return None
         try:
-            event = await asyncio.wait_for(self._get_queue().get(), timeout=0.01)
+            event = await asyncio.wait_for(self._get_queue().get(), timeout=timeout)
             self._events_returned += 1
             return event
         except asyncio.TimeoutError:
@@ -118,7 +118,7 @@ async def test_seance_default_values():
     spine = Spine(organs=organs, backend=backend)
     spine_ref[0] = spine
 
-    # Minimal event with no payload
+    # Minimal event with empty payload dictionary
     start_event = Event(event_type="SUMMON_RITUAL")
 
     await spine.run(start_event)

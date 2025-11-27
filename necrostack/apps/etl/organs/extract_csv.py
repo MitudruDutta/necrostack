@@ -25,8 +25,8 @@ class ExtractCSV(Organ):
         source_name = event.payload.get("source_name", "unknown")
 
         # Parse CSV data into records
-        lines = csv_data.strip().split("\n")
-        if not lines:
+        stripped_data = csv_data.strip()
+        if not stripped_data:
             return Event(
                 event_type="RAW_DATA_LOADED",
                 payload={
@@ -36,6 +36,8 @@ class ExtractCSV(Organ):
                     "row_count": 0,
                 },
             )
+        
+        lines = stripped_data.split("\n")
 
         headers = [h.strip() for h in lines[0].split(",")]
         records = []

@@ -1,5 +1,7 @@
 """ManifestEffect organ: OMEN_REVEALED → print output."""
 
+from typing import Any, Callable, Optional
+
 from necrostack.core.event import Event
 from necrostack.core.organ import Organ
 
@@ -9,7 +11,7 @@ class ManifestEffect(Organ):
 
     listens_to = ["OMEN_REVEALED"]
 
-    def __init__(self, name: str | None = None, output_callback: callable = None):
+    def __init__(self, name: str | None = None, output_callback: Optional[Callable[..., Any]] = None):
         """Initialize ManifestEffect.
 
         Args:
@@ -46,5 +48,3 @@ class ManifestEffect(Organ):
 
         self.last_output = output
         self._output_callback(output)
-
-        return None

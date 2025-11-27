@@ -37,11 +37,12 @@ class TransformData(Organ):
                     continue
 
             if values:
+                total = sum(values)
                 numeric_stats[header] = {
                     "min": min(values),
                     "max": max(values),
-                    "sum": sum(values),
-                    "avg": sum(values) / len(values),
+                    "sum": total,
+                    "avg": total / len(values),
                     "count": len(values),
                 }
 

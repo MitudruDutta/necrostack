@@ -38,7 +38,7 @@ class CleanData(Organ):
             cleaned_record = {}
             for key, value in record.items():
                 if isinstance(value, str):
-                    cleaned_record[key] = value.strip()
+                    cleaned_record[key] = value.strip().lower()
                 else:
                     cleaned_record[key] = value
             cleaned_records.append(cleaned_record)

@@ -21,9 +21,10 @@ class InterpretResponse(Organ):
         spirit_name = event.payload.get("spirit_name", "Unknown Spirit")
         answer = event.payload.get("answer", "")
 
-        # Interpret the answer into an omen
+        # TODO: Replace with actual interpretation logic that analyzes the answer content.
+        # Currently a placeholder that incorporates the answer into the interpretation.
         omen = f"The words of {spirit_name} foretell: A great change approaches."
-        interpretation = "The spirits suggest patience and vigilance."
+        interpretation = f"The spirits suggest patience and vigilance. (Based on: {answer[:50]}{'...' if len(answer) > 50 else ''})" if answer else "The spirits suggest patience and vigilance."
 
         return Event(
             event_type="OMEN_REVEALED",
