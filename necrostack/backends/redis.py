@@ -63,14 +63,21 @@ class RedisBackend:
         
         Args:
             event: The event to enqueue
+        
+        Raises:
+            Exception: If event cannot be enqueued
         """
-        client = await self._ensure_connected()
-        event_data = event.model_dump_jsonable()
-        await client.xadd(
-            self._stream_key,
-            {"event": json.dumps(event_data)},
-        )
-        self._log.debug("Enqueued event %s to stream %s", event.id, self._stream_key)
+        try:
+            client = await self._ensure_connected()
+            event_data = event.model_dump_jsonable()
+            await client.xadd(
+                self._stream_key,
+                {"event": json.dumps(event_data)},
+            )
+            self._log.debug("Enqueued event %s to stream %s", event.id, self._stream_key)
+        except Exception as e:
+            self._log.error("Failed to enqueue event %s: %s", event.id, e)
+            raise
 
     async def pull(self, timeout: float | None = None) -> Event | None:
         """Retrieve the next event from the Redis stream using XREAD.
