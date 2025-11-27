@@ -75,6 +75,28 @@ necrostack/
 └── apps/           # Demo applications (Séance, ETL)
 ```
 
+## Demo Applications
+
+### Séance Demo
+
+A mystical event chain demonstrating the framework:
+
+```
+SUMMON_RITUAL → SPIRIT_APPEARED → ANSWER_GENERATED → OMEN_REVEALED → output
+```
+
+Run with: `python -m necrostack.apps.seance.main`
+
+### ETL Demo
+
+A data pipeline demonstrating practical usage:
+
+```
+ETL_START → RAW_DATA_LOADED → DATA_CLEANED → DATA_TRANSFORMED → summary
+```
+
+Run with: `python -m necrostack.apps.etl.main`
+
 ## Backends
 
 ### InMemoryBackend (Development)
@@ -97,10 +119,18 @@ from necrostack.backends.redis_backend import RedisBackend
 backend = RedisBackend(redis_url="redis://localhost:6379", stream_key="necrostack:events")
 ```
 
+**Behavior:**
+- Uses Redis Streams (`XADD`/`XREAD`) for event storage
+- Events are serialized via Pydantic's `model_dump()` and stored as JSON
+- Blocking reads with configurable timeout
+- Automatic reconnection on connection drops
+
 **MVP Limitations:**
-- No consumer group support (Phase 2)
-- `ack()` is a no-op
-- At-least-once semantics
+- No consumer group support (`XREADGROUP`/`XACK` planned for Phase 2)
+- `ack()` is a no-op — events are not acknowledged
+- At-least-once delivery semantics (no exactly-once guarantees)
+- No dead-letter queue (Phase 2)
+- No retry/backoff logic (Phase 2)
 
 ## Roadmap
 

@@ -188,8 +188,8 @@
 - [x] 14. Checkpoint - Ensure demo apps work
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 15. Update README and documentation
-  - [ ] 15.1 Update README with full documentation
+- [x] 15. Update README and documentation
+  - [x] 15.1 Update README with full documentation
     - Add "What is NecroStack?" section
     - Add features list (Event/Organ/Spine, async dispatch, backends, demos)
     - Add installation instructions (`pip install necrostack` or editable mode)
@@ -198,12 +198,12 @@
     - Add roadmap section
     - _Requirements: 7.4_
 
-- [ ] 16. Set up CI (optional)
-  - [ ] 16.1 Create GitHub Actions workflow
+- [x] 16. Set up CI (optional)
+  - [x] 16.1 Create GitHub Actions workflow
     - Add `.github/workflows/ci.yml`
     - Run pytest with Hypothesis CI profile
     - Skip Redis tests in CI (or use service container)
     - Run linting (ruff/black optional)
 
-- [ ] 17. Final Checkpoint - Ensure all tests pass
+- [x] 17. Final Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.

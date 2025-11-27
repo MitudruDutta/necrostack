@@ -65,11 +65,11 @@ def test_clean_data_organ():
     assert result.event_type == "DATA_CLEANED"
     assert result.payload["row_count"] == 2
     assert result.payload["removed_count"] == 1
-    # Bob should be removed
+    # Bob should be removed (names are lowercased by CleanData)
     names = [r["name"] for r in result.payload["records"]]
-    assert "Bob" not in names
-    assert "Alice" in names
-    assert "Charlie" in names
+    assert "bob" not in names
+    assert "alice" in names
+    assert "charlie" in names
 
 
 def test_transform_data_organ():
