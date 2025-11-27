@@ -12,7 +12,7 @@ MVP Limitations:
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 from urllib.parse import urlparse, urlunparse
 

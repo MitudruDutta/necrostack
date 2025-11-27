@@ -6,8 +6,6 @@ These tests require a running Redis instance. Start one with:
 Tests will be skipped if Redis is not available.
 """
 
-import asyncio
-
 import pytest
 
 from necrostack.backends.redis_backend import RedisBackend
@@ -51,9 +49,7 @@ async def redis_backend():
     try:
         await backend.delete_stream(stream_key)
     except RedisError as e:
-        logging.getLogger(__name__).warning(
-            f"Failed to cleanup test stream {stream_key}: {e}"
-        )
+        logging.getLogger(__name__).warning(f"Failed to cleanup test stream {stream_key}: {e}")
     except Exception as e:
         logging.getLogger(__name__).error(
             f"Unexpected error cleaning up test stream {stream_key}: {e}"

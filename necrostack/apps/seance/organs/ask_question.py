@@ -23,7 +23,10 @@ class AskQuestion(Organ):
 
         # TODO: Replace with actual QA/generative function to produce dynamic answers.
         # Currently a placeholder that incorporates the question into the response.
-        answer = f"The {spirit_name} speaks in response to '{question}': 'The path you seek lies within shadows and light.'"
+        answer = (
+            f"The {spirit_name} speaks in response to '{question}': "
+            f"'The path you seek lies within shadows and light.'"
+        )
 
         return Event(
             event_type="ANSWER_GENERATED",

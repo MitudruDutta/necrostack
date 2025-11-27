@@ -24,7 +24,13 @@ class InterpretResponse(Organ):
         # TODO: Replace with actual interpretation logic that analyzes the answer content.
         # Currently a placeholder that incorporates the answer into the interpretation.
         omen = f"The words of {spirit_name} foretell: A great change approaches."
-        interpretation = f"The spirits suggest patience and vigilance. (Based on: {answer[:50]}{'...' if len(answer) > 50 else ''})" if answer else "The spirits suggest patience and vigilance."
+        if answer:
+            truncated_answer = f"{answer[:50]}{'...' if len(answer) > 50 else ''}"
+            interpretation = (
+                f"The spirits suggest patience and vigilance. " f"(Based on: {truncated_answer})"
+            )
+        else:
+            interpretation = "The spirits suggest patience and vigilance."
 
         return Event(
             event_type="OMEN_REVEALED",

@@ -6,7 +6,7 @@ from necrostack.core.organ import Organ
 
 class TransformData(Organ):
     """Handles DATA_CLEANED events and emits DATA_TRANSFORMED.
-    
+
     Transforms cleaned data by computing aggregations and statistics.
     """
 

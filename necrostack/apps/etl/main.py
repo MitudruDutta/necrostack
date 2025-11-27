@@ -10,19 +10,17 @@ Usage:
 """
 
 import asyncio
-from typing import Callable, Optional
+from collections.abc import Callable
 
+from necrostack.apps.etl.organs import (
+    CleanData,
+    ExportSummary,
+    ExtractCSV,
+    TransformData,
+)
 from necrostack.backends.inmemory import InMemoryBackend
 from necrostack.core.event import Event
 from necrostack.core.spine import Spine
-
-from necrostack.apps.etl.organs import (
-    ExtractCSV,
-    CleanData,
-    TransformData,
-    ExportSummary,
-)
-
 
 # Embedded sample CSV data for the demo
 SAMPLE_CSV_DATA = """name,age,salary,department
@@ -42,7 +40,7 @@ Jack,33,72000,Sales
 async def run_etl(
     csv_data: str = SAMPLE_CSV_DATA,
     source_name: str = "employees.csv",
-    output_callback: Optional[Callable[[str], None]] = None,
+    output_callback: Callable[[str], None] | None = None,
 ) -> ExportSummary:
     """Run a complete ETL pipeline.
 

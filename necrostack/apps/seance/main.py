@@ -11,16 +11,15 @@ Usage:
 
 import asyncio
 
-from necrostack.backends.inmemory import InMemoryBackend
-from necrostack.core.event import Event
-from necrostack.core.spine import Spine
-
 from necrostack.apps.seance.organs import (
-    SummonSpirit,
     AskQuestion,
     InterpretResponse,
     ManifestEffect,
+    SummonSpirit,
 )
+from necrostack.backends.inmemory import InMemoryBackend
+from necrostack.core.event import Event
+from necrostack.core.spine import Spine
 
 
 async def run_seance(

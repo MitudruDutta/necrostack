@@ -1,7 +1,8 @@
 """Organ base class for NecroStack event handlers."""
 
 from abc import ABC, abstractmethod
-from typing import Awaitable, ClassVar
+from collections.abc import Awaitable
+from typing import ClassVar
 
 from necrostack.core.event import Event
 

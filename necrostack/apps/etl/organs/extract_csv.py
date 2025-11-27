@@ -6,7 +6,7 @@ from necrostack.core.organ import Organ
 
 class ExtractCSV(Organ):
     """Handles ETL_START events and emits RAW_DATA_LOADED.
-    
+
     Extracts CSV data from the event payload and loads it as raw records.
     """
 
@@ -36,7 +36,7 @@ class ExtractCSV(Organ):
                     "row_count": 0,
                 },
             )
-        
+
         lines = stripped_data.split("\n")
 
         headers = [h.strip() for h in lines[0].split(",")]

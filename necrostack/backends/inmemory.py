@@ -38,7 +38,7 @@ class InMemoryBackend:
         """
         try:
             return await asyncio.wait_for(self._queue.get(), timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return None
 
     async def ack(self, event: Event) -> None:

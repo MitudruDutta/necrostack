@@ -6,7 +6,7 @@ from necrostack.core.organ import Organ
 
 class CleanData(Organ):
     """Handles RAW_DATA_LOADED events and emits DATA_CLEANED.
-    
+
     Cleans raw data by removing empty values and normalizing strings.
     """
 

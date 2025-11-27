@@ -11,7 +11,6 @@ go through the backend.
 
 import asyncio
 import inspect
-import logging
 from collections import defaultdict
 from enum import Enum
 from typing import TYPE_CHECKING, Protocol
@@ -131,10 +130,7 @@ class Spine:
                         f"found {type(item).__name__}: {item!r}"
                     )
 
-
-    async def _invoke_handler(
-        self, organ: Organ, event: Event
-    ) -> Event | list[Event] | None:
+    async def _invoke_handler(self, organ: Organ, event: Event) -> Event | list[Event] | None:
         """Invoke an organ's handler, handling both sync and async handlers.
 
         Args:
@@ -199,7 +195,8 @@ class Spine:
             for attempt in range(self.retry_attempts):
                 delay = self.retry_base_delay * (2**attempt)
                 self._log.warning(
-                    f"Enqueue failed, retrying in {delay}s (attempt {attempt + 1}/{self.retry_attempts})",
+                    f"Enqueue failed, retrying in {delay}s "
+                    f"(attempt {attempt + 1}/{self.retry_attempts})",
                     extra={
                         "event_id": str(event.id),
                         "event_type": event.event_type,
@@ -324,9 +321,7 @@ class Spine:
 
                     # Enqueue returned events (Requirement 3.5)
                     if emitted is not None:
-                        events_to_enqueue = (
-                            [emitted] if isinstance(emitted, Event) else emitted
-                        )
+                        events_to_enqueue = [emitted] if isinstance(emitted, Event) else emitted
                         emitted_types = []
 
                         for new_event in events_to_enqueue:

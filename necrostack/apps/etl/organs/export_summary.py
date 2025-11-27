@@ -1,6 +1,6 @@
 """ExportSummary organ: DATA_TRANSFORMED → print summary."""
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from necrostack.core.event import Event
 from necrostack.core.organ import Organ
@@ -8,13 +8,17 @@ from necrostack.core.organ import Organ
 
 class ExportSummary(Organ):
     """Handles DATA_TRANSFORMED events and prints a summary.
-    
+
     Final stage of the ETL pipeline that outputs the transformation results.
     """
 
     listens_to = ["DATA_TRANSFORMED"]
 
-    def __init__(self, name: str | None = None, output_callback: Optional[Callable[[str], None]] = None):
+    def __init__(
+        self,
+        name: str | None = None,
+        output_callback: Callable[[str], None] | None = None,
+    ):
         """Initialize the ExportSummary organ.
 
         Args:
@@ -50,10 +54,10 @@ class ExportSummary(Organ):
             for field, stats in numeric_stats.items():
                 if not isinstance(stats, dict):
                     continue
-                
+
                 # Extract and validate each stat value
                 stat_values = {}
-                for key in ('min', 'max', 'avg', 'sum'):
+                for key in ("min", "max", "avg", "sum"):
                     val = stats.get(key)
                     if isinstance(val, (int, float)):
                         stat_values[key] = f"{val:.2f}"
@@ -63,7 +67,7 @@ class ExportSummary(Organ):
                             stat_values[key] = f"{float(val):.2f}"
                         except (TypeError, ValueError):
                             stat_values[key] = "N/A"
-                
+
                 summary_lines.append(
                     f"  {field}: min={stat_values['min']}, max={stat_values['max']}, "
                     f"avg={stat_values['avg']}, sum={stat_values['sum']}"

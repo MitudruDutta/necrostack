@@ -4,16 +4,17 @@ Validates: Requirements 8.1 - Complete event chain execution
 """
 
 import asyncio
+
 import pytest
 
-from necrostack.core.event import Event
-from necrostack.core.spine import Spine
 from necrostack.apps.seance.organs import (
-    SummonSpirit,
     AskQuestion,
     InterpretResponse,
     ManifestEffect,
+    SummonSpirit,
 )
+from necrostack.core.event import Event
+from necrostack.core.spine import Spine
 
 
 class StoppingBackend:
@@ -42,7 +43,7 @@ class StoppingBackend:
             event = await asyncio.wait_for(self._get_queue().get(), timeout=timeout)
             self._events_returned += 1
             return event
-        except asyncio.TimeoutError:
+        except TimeoutError:
             if self._spine_ref[0]:
                 self._spine_ref[0].stop()
             return None
