@@ -39,17 +39,25 @@ REDIS_URL = "redis://localhost:6379"
 @pytest.fixture
 async def redis_backend():
     """Create a RedisBackend with a unique stream key for test isolation."""
+    import logging
     import uuid
+
+    from redis.exceptions import RedisError
 
     stream_key = f"necrostack:test:{uuid.uuid4().hex[:8]}"
     backend = RedisBackend(redis_url=REDIS_URL, stream_key=stream_key)
     yield backend
-    # Cleanup: delete the test stream
+    # Cleanup: delete the test stream using public API
     try:
-        redis = await backend._get_client()
-        await redis.delete(stream_key)
-    except Exception:
-        pass
+        await backend.delete_stream(stream_key)
+    except RedisError as e:
+        logging.getLogger(__name__).warning(
+            f"Failed to cleanup test stream {stream_key}: {e}"
+        )
+    except Exception as e:
+        logging.getLogger(__name__).error(
+            f"Unexpected error cleaning up test stream {stream_key}: {e}"
+        )
     await backend.close()
 
 

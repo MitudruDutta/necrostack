@@ -14,10 +14,41 @@ import json
 import logging
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlparse, urlunparse
 
 from necrostack.core.event import Event
 
 logger = logging.getLogger("necrostack.redis_backend")
+
+
+def _sanitize_redis_url(url: str) -> str:
+    """Sanitize a Redis URL by masking the password component.
+
+    Args:
+        url: Redis connection URL that may contain credentials.
+
+    Returns:
+        URL with password replaced by '****' or host:port if parsing fails.
+    """
+    try:
+        parsed = urlparse(url)
+        if parsed.password:
+            # Replace password with masked value
+            netloc = f"{parsed.username}:****@{parsed.hostname}"
+            if parsed.port:
+                netloc += f":{parsed.port}"
+            sanitized = urlunparse(
+                (parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment)
+            )
+            return sanitized
+        elif parsed.hostname:
+            # No password, return host:port
+            port = parsed.port or 6379
+            return f"{parsed.hostname}:{port}"
+        else:
+            return "<invalid-url>"
+    except Exception:
+        return "<unparseable-url>"
 
 
 class RedisBackend:
@@ -62,16 +93,16 @@ class RedisBackend:
 
         if self._redis is None:
             self._redis = Redis.from_url(self.redis_url, decode_responses=True)
-            logger.debug(f"Connected to Redis at {self.redis_url}")
+            logger.debug(f"Connected to Redis at {_sanitize_redis_url(self.redis_url)}")
 
         # Test connection and reconnect if needed
         try:
             await self._redis.ping()
-        except Exception as e:
-            logger.warning(f"Redis connection lost, reconnecting: {e}")
+        except Exception:
+            logger.warning("Redis connection lost, reconnecting...")
             self._redis = Redis.from_url(self.redis_url, decode_responses=True)
             await self._redis.ping()
-            logger.info("Reconnected to Redis")
+            logger.info(f"Reconnected to Redis at {_sanitize_redis_url(self.redis_url)}")
 
         return self._redis
 
@@ -125,7 +156,6 @@ class RedisBackend:
         # Parse response: [[stream_key, [(message_id, {field: value})]]]
         _, messages = response[0]
         message_id, raw_data = messages[0]
-        self._last_id = message_id
 
         # Deserialize event from JSON
         try:
@@ -133,10 +163,13 @@ class RedisBackend:
             # Parse ISO timestamp back to datetime
             event_dict["timestamp"] = datetime.fromisoformat(event_dict["timestamp"])
             event = Event(**event_dict)
+            self._last_id = message_id
             logger.debug(f"Pulled event {event.id} from stream {self.stream_key}")
             return event
         except (json.JSONDecodeError, KeyError, ValueError) as e:
             logger.error(f"Failed to deserialize event from Redis: {e}")
+            # Note: message_id not advanced - will retry same message
+            # Consider implementing a skip mechanism or DLQ to avoid infinite loops
             return None
 
     async def ack(self, event: Event) -> None:
@@ -150,6 +183,35 @@ class RedisBackend:
         """
         # No-op in MVP - Phase 2 will implement consumer groups
         pass
+
+    async def get_client(self) -> Any:
+        """Get the Redis client (public accessor).
+
+        Returns:
+            Connected Redis client instance.
+
+        Raises:
+            ImportError: If redis package is not installed.
+        """
+        return await self._get_client()
+
+    async def delete_stream(self, stream_key: str | None = None) -> None:
+        """Delete a Redis stream.
+
+        Args:
+            stream_key: The stream key to delete. Defaults to this backend's stream_key.
+
+        Raises:
+            Exception: If deletion fails (logged and re-raised).
+        """
+        key = stream_key or self.stream_key
+        try:
+            redis = await self._get_client()
+            await redis.delete(key)
+            logger.debug(f"Deleted stream {key}")
+        except Exception as e:
+            logger.error(f"Failed to delete stream {key}: {e}")
+            raise
 
     async def close(self) -> None:
         """Close the Redis connection.
