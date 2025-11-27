@@ -151,41 +151,41 @@
     - Tests should use `pytest.mark.skipif()` with a utility that checks Redis availability
     - _Requirements: 6.2, 6.3_
 
-- [ ] 12. Implement Séance demo application
-  - [ ] 12.1 Create Séance organs (app-specific, not in core)
+- [x] 12. Implement Séance demo application
+  - [x] 12.1 Create Séance organs (app-specific, not in core)
     - Create `necrostack/apps/seance/organs/` directory
     - Implement `SummonSpirit` organ (SUMMON_RITUAL → SPIRIT_APPEARED)
     - Implement `AskQuestion` organ (SPIRIT_APPEARED → ANSWER_GENERATED)
     - Implement `InterpretResponse` organ (ANSWER_GENERATED → OMEN_REVEALED)
     - Implement `ManifestEffect` organ (OMEN_REVEALED → print output)
     - _Requirements: 8.2, 8.3, 8.4, 8.5_
-  - [ ] 12.2 Create Séance app entrypoint
+  - [x] 12.2 Create Séance app entrypoint
     - Implement `necrostack/apps/seance/main.py`
     - Wire up organs with Spine and InMemoryBackend
     - Start with SUMMON_RITUAL event
     - _Requirements: 8.1, 8.3_
-  - [ ] 12.3 Write integration test for Séance flow
+  - [x] 12.3 Write integration test for Séance flow
     - Verify complete event chain execution
     - _Requirements: 8.1_
 
-- [ ] 13. Implement ETL demo application
-  - [ ] 13.1 Create ETL organs (app-specific, not in core)
+- [x] 13. Implement ETL demo application
+  - [x] 13.1 Create ETL organs (app-specific, not in core)
     - Create `necrostack/apps/etl/organs/` directory
     - Implement `ExtractCSV` organ (ETL_START → RAW_DATA_LOADED)
     - Implement `CleanData` organ (RAW_DATA_LOADED → DATA_CLEANED)
     - Implement `TransformData` organ (DATA_CLEANED → DATA_TRANSFORMED)
     - Implement `ExportSummary` organ (DATA_TRANSFORMED → print summary)
     - _Requirements: 9.2, 9.3, 9.4, 9.5_
-  - [ ] 13.2 Create ETL app entrypoint
+  - [x] 13.2 Create ETL app entrypoint
     - Implement `necrostack/apps/etl/main.py`
     - Wire up organs with Spine and InMemoryBackend
     - Include embedded sample CSV data
     - _Requirements: 9.1_
-  - [ ] 13.3 Write integration test for ETL flow
+  - [x] 13.3 Write integration test for ETL flow
     - Verify complete data pipeline execution
     - _Requirements: 9.1_
 
-- [ ] 14. Checkpoint - Ensure demo apps work
+- [x] 14. Checkpoint - Ensure demo apps work
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 15. Update README and documentation
