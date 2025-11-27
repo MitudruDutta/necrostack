@@ -1,50 +1,43 @@
-"""Organ base class for NecroStack."""
+"""Organ base class for NecroStack event handlers."""
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Awaitable, ClassVar, Sequence
+from typing import Awaitable, ClassVar
 
-if TYPE_CHECKING:
-    from .event import Event
+from necrostack.core.event import Event
 
 
 class Organ(ABC):
-    """Base class for all event handlers in NecroStack.
-    
-    Organs are modular components that listen to specific event types
-    and process them via the handle() method.
-    
-    Usage:
-        class MyOrgan(Organ):
-            listens_to = ["my_event_type"]
-            
-            def handle(self, event: Event) -> Event | None:
-                # Process event
-                return None
+    """Base class for event handlers.
+
+    Organs are pluggable components that handle events and may emit new events.
+    Each Organ declares which event types it listens to via the `listens_to`
+    class attribute.
+
+    Note: Validation of `listens_to` happens in Spine during registration,
+    not in the Organ itself.
     """
 
     listens_to: ClassVar[list[str]] = []
 
+    def __init__(self, name: str | None = None) -> None:
+        """Initialize the Organ.
+
+        Args:
+            name: Optional name for the organ. Defaults to the class name.
+        """
+        self.name = name or self.__class__.__name__
+
     @abstractmethod
     def handle(
-        self, event: "Event"
-    ) -> (
-        "Event"
-        | Sequence["Event"]
-        | None
-        | Awaitable["Event" | Sequence["Event"] | None]
-    ):
-        """Process an event.
-        
-        May be synchronous or asynchronous. Return values:
-        - Event: Single event to be enqueued
-        - Sequence[Event]: Multiple events to be enqueued
-        - None: Terminal step, no further action
-        - Awaitable: Async version of any of the above
-        
+        self,
+        event: Event,
+    ) -> Event | list[Event] | None | Awaitable[Event | list[Event] | None]:
+        """Handle an incoming event.
+
         Args:
-            event: The event to process
-            
+            event: The event to handle.
+
         Returns:
-            Event(s) to enqueue, or None for terminal processing
+            An Event, a list of Events, None, or an awaitable resolving to the same.
         """
         ...

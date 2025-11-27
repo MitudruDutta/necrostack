@@ -1,261 +1,165 @@
-1. Introduction
+# Requirements Document — NecroStack
 
-NecroStack is a minimal, async-first event-driven micro-framework for Python 3.11+.
-It provides three core abstractions:
+## Introduction
 
-Event — A typed, immutable, validated message object
+NecroStack is a minimal, async-first event-driven micro-framework for Python 3.11+. It provides three core abstractions: **Event** (a typed, immutable message), **Organ** (a pluggable event handler), and **Spine** (a queue-driven dispatcher). The framework supports two backends (in-memory and Redis Streams), uses Pydantic for validation, and prioritizes simplicity and production-minded clarity.
 
-Organ — A pluggable module that listens to specific event types
+## Glossary
 
-Spine — A queue-based dispatcher that routes events to Organs and enqueues resulting events
+- **Event**: A Pydantic-validated, immutable message object containing `id`, `timestamp`, `event_type`, and `payload`.
+- **Organ**: A pluggable component that handles events and may emit new events.
+- **Spine**: The central dispatcher that pulls events from a backend, routes them to Organs, and enqueues any returned events.
+- **Backend**: A queue abstraction implementing async `enqueue`, `pull`, and `ack`.
+- **Handler**: The Organ’s `handle(event)` method.
+- **Event Type**: A string identifier (UPPER_SNAKE_CASE) used for routing.
 
-NecroStack prioritizes simplicity, modularity, and clarity.
-It supports two queue backends:
+---
 
-In-memory backend (MVP, dev mode)
+# Requirement 1: Event Model
 
-Redis Streams backend (MVP-light, Phase 2 for full consumer groups)
+**User Story:** As a developer, I want validated, immutable events with strong typing.
 
-The framework uses Pydantic v2 for event validation and is designed to be fully type-safe with excellent developer experience.
+### Acceptance Criteria
 
-2. Glossary
+1. Events SHALL be instances of a Pydantic BaseModel.
+2. Events SHALL generate a UUID automatically if no id is provided.
+3. Events SHALL set the current UTC timestamp automatically.
+4. Events SHALL require a non-empty `event_type: str`.
+5. Events SHALL forbid unknown fields (`extra="forbid"`).
+6. Events SHALL support JSON serialization via `model_dump()`.
+7. Deserialization SHALL reconstruct a valid Event instance.
 
-Event — Immutable Pydantic-based message object with ID, type, payload, and timestamp.
+---
 
-Organ — A modular component implementing a handle(event) method and declaring the events it listens to via listens_to.
+# Requirement 2: Organ Base Class
 
-Spine — Central dispatcher that processes events in FIFO order, calling Organs and enqueuing emitted events.
+**User Story:** As a developer, I want modular event handlers with a predictable interface.
 
-Backend — A queue implementation for storing, retrieving, and acknowledging events.
+### Acceptance Criteria
 
-Handler — The Organ’s handle(event) method that processes incoming events.
+1. Organ SHALL inherit from `ABC`.
+2. Organ SHALL define a class attribute `listens_to: list[str]`.
+3. `Spine` SHALL validate that `listens_to` contains only strings during registration.
+4. Organ SHALL automatically use its class name as its `name` attribute.
+5. Organ subclasses SHALL implement `handle(self, event)`.
+6. `handle()` SHALL accept exactly one `Event` argument.
+7. `handle()` SHALL return:  
+   - an `Event`,  
+   - a sequence of `Event`s,  
+   - `None`,  
+   - or an awaitable resolving to the same.
 
-3. Requirements
-Requirement 1: Event Definition and Validation
+---
 
-User Story:
-As a developer, I want typed, validated events so my application can maintain data integrity throughout processing.
+# Requirement 3: Spine Dispatcher
 
-Acceptance Criteria
+**User Story:** As a developer, I want a dispatcher that reliably routes events to the correct organs.
 
-WHEN a developer defines an Event THEN NecroStack SHALL provide a base Event class extending pydantic.BaseModel.
+### Acceptance Criteria
 
-WHEN an Event is instantiated with invalid data THEN NecroStack SHALL raise a Pydantic validation error with descriptive messages.
+1. Spine SHALL accept a list of Organ instances, a Backend, and `max_steps` (default 10,000).
+2. Spine.run() SHALL repeatedly call `backend.pull()` to fetch events.
+3. Spine SHALL dispatch events to all Organs whose `listens_to` contains `event.event_type`.
+4. Async handlers SHALL be awaited; sync handlers SHALL be called directly.
+5. If a handler returns an Event or list of Events, Spine SHALL enqueue them via `backend.enqueue`.
+6. Spine SHALL invoke Organs in the order provided to its constructor.
+7. If processing exceeds `max_steps`, Spine SHALL raise `RuntimeError("Max steps exceeded")`.
+8. If `backend.pull()` returns `None` (timeout), Spine SHALL continue.
+9. Spine SHALL use structured logging (JSON logs) for dispatching and handler results.
 
-WHEN an Event is created with valid data THEN NecroStack SHALL assign:
+---
 
-a unique identifier
+# Requirement 4: Backend Protocol
 
-a creation timestamp
+**User Story:** As a developer, I want pluggable backends.
 
-immutable fields (frozen model)
+### Acceptance Criteria
 
-WHEN an Event is serialized THEN NecroStack SHALL produce a JSON-compatible dict.
+1. Backend SHALL define async methods: `enqueue(Event)`, `pull(timeout)`, `ack(Event)`.
+2. `enqueue()` SHALL store the event.
+3. `pull()` SHALL return the next event or `None` on timeout.
+4. `ack()` MAY be a no-op in non-durable backends.
 
-WHEN an Event is deserialized THEN NecroStack SHALL reconstruct the original Event with full schema validation.
+---
 
-Requirement 2: Organ Registration and Event Handling
+# Requirement 5: InMemoryBackend
 
-User Story:
-As a developer, I want to create modular event handlers so that I can build clean, extensible event-driven workflows.
+**User Story:** I want a simple backend for development.
 
-Acceptance Criteria
+### Acceptance Criteria
 
-WHEN a developer creates an Organ class THEN NecroStack SHALL provide a base Organ class.
+1. InMemoryBackend SHALL use `asyncio.Queue` internally.
+2. `enqueue()` SHALL put the event in FIFO order.
+3. `pull(timeout)` SHALL block until an event is available or timeout.
+4. On timeout, `pull()` SHALL return `None`.
+5. `ack()` SHALL be a no-op.
 
-WHEN an Organ sets listens_to = ["SOME_EVENT"] THEN NecroStack SHALL automatically register it for those event types.
+---
 
-WHEN the Spine routes an event THEN NecroStack SHALL invoke the Organ’s handle(self, event) method.
+# Requirement 6: RedisBackend (MVP + Phase 2)
 
-WHEN an Organ handler is asynchronous THEN NecroStack SHALL await its execution.
+**User Story:** I want a Redis Streams backend for persistence.
 
-WHEN an Organ handler is synchronous THEN NecroStack SHALL call it directly.
+### MVP Acceptance Criteria
 
-WHEN a handler returns an Event or a sequence of Events THEN NecroStack SHALL enqueue them.
+1. RedisBackend SHALL accept `redis_url` and `stream_key` (default `"necrostack:events"`).
+2. `enqueue()` SHALL serialize events using `event.model_dump()` and call `XADD`.
+3. `pull()` SHALL use `XREAD` with blocking timeout.
+4. `ack()` SHALL be a no-op in MVP.
+5. RedisBackend SHALL automatically reconnect if connection drops.
 
-WHEN a handler returns None THEN NecroStack SHALL treat it as a terminal step with no further action.
+### Phase 2 (Not required for MVP)
 
-Important:
-There SHALL NOT be decorator-based registration of handlers.
-NecroStack uses only the listens_to list + single handle() method.
+1. Add consumer group support (`XREADGROUP`, `XACK`).
+2. Add dead-letter queue.
+3. Add retry & backoff logic.
 
-Requirement 3: Spine Dispatcher Operations
+---
 
-User Story:
-As a developer, I want a reliable dispatcher that routes events to handlers efficiently and safely.
+# Requirement 7: Project Structure
 
-Acceptance Criteria
+1. Project SHALL use `necrostack/core`, `necrostack/backends`, `necrostack/utils`, `necrostack/apps` (app-specific organs live under `necrostack/apps/{app}/organs/`).
+2. Packaging SHALL use `pyproject.toml`.
+3. `.gitignore` SHALL exclude Python artifacts.
+4. README SHALL describe features, architecture, and quickstart.
 
-WHEN the Spine is initialized THEN it SHALL accept:
+---
 
-a list of Organs
+# Requirement 8: Séance Demo Application
 
-a backend instance
+### Acceptance Criteria
 
-optional configuration (e.g., max_steps)
+1. Demo SHALL include the event chain:
 
-WHEN the Spine starts THEN it SHALL continuously pull events from the backend.
+   - `SUMMON_RITUAL` → `SPIRIT_APPEARED`  
+   - `SPIRIT_APPEARED` → `ANSWER_GENERATED`  
+   - `ANSWER_GENERATED` → `OMEN_REVEALED`  
+   - `OMEN_REVEALED` → printed output
 
-WHEN an event is received THEN the Spine SHALL:
+2. Each stage SHALL be implemented as an Organ.
+3. Demo SHALL run using InMemoryBackend.
 
-find all Organs whose listens_to contains the event type
+---
 
-invoke their handlers
+# Requirement 9: ETL Demo Application
 
-WHEN multiple Organs listen to the same event THEN Spine SHALL invoke them in deterministic registration order.
+### Acceptance Criteria
 
-WHEN a handler raises an exception THEN the Spine SHALL:
+1. Demo SHALL include the event chain:
 
-log the error
+   - `ETL_START` → `RAW_DATA_LOADED`  
+   - `RAW_DATA_LOADED` → `DATA_CLEANED`  
+   - `DATA_CLEANED` → `DATA_TRANSFORMED`  
+   - `DATA_TRANSFORMED` → printed summary
 
-continue processing remaining events
+---
 
-WHEN the Spine receives a shutdown request THEN it SHALL:
+# Requirement 10: Test Suite
 
-finish processing in-flight events
+### Acceptance Criteria
 
-gracefully stop pulling new events
-
-Spine SHALL prevent infinite event loops using:
-
-a max-steps guard
-
-optional per-run deduplication of event IDs
-
-Requirement 4: In-Memory Backend (MVP)
-
-User Story:
-As a developer, I want a fast, simple queue backend for development and testing.
-
-Acceptance Criteria
-
-WHEN the in-memory backend initializes THEN it SHALL create an async-compatible queue (e.g., asyncio.Queue).
-
-WHEN an event is enqueued THEN it SHALL be stored in FIFO order.
-
-WHEN an event is dequeued THEN the backend SHALL return the oldest event.
-
-WHEN the backend queue is empty THEN pull() SHALL block until an event is available or timeout occurs.
-
-WHEN the backend shuts down THEN it SHALL discard pending events and release resources.
-
-Requirement 5: Redis Streams Backend (MVP-Light + Phase 2)
-
-User Story:
-As a developer, I want a durable, distributed backend for production environments.
-
-Acceptance Criteria (MVP-Light, Implementable in Hackathon)
-
-WHEN the Redis backend initializes THEN it SHALL open a connection to Redis.
-
-WHEN an event is enqueued THEN it SHALL serialize the event and call XADD.
-
-WHEN pulling events THEN the backend SHALL use XREAD (simple consumer) with blocking timeout.
-
-WHEN processing is done THEN ack() MAY be a no-op in MVP.
-
-WHEN Redis connection fails THEN backend SHALL attempt transparent reconnection.
-
-Acceptance Criteria (Phase 2, Not Required for Hackathon)
-
-Full consumer group support (XGROUP CREATE, XREADGROUP, XACK)
-
-Pending list recovery
-
-Dead-letter queue support
-
-Exponential backoff retry and connection lifecycle management
-
-Requirement 6: Project Structure and Packaging
-
-User Story:
-As a developer, I want clear organization and modern packaging so I can easily install and extend NecroStack.
-
-Acceptance Criteria
-
-WHEN installed THEN NecroStack SHALL be importable as necrostack.
-
-WHEN published THEN NecroStack SHALL include a complete pyproject.toml with:
-
-name, version, authors, license, classifiers
-
-dependencies for core and extras
-
-WHEN a developer installs necrostack[redis] THEN Redis dependencies SHALL also install.
-
-WHEN importing necrostack THEN top-level imports SHALL include:
-
-Event
-
-Organ
-
-Spine
-
-Requirement 7: Type Safety and Developer Experience
-
-User Story:
-As a developer, I want a strongly typed framework with great IDE support.
-
-Acceptance Criteria
-
-All public APIs SHALL include precise type hints.
-
-IF an Organ declares incorrect handler signature THEN NecroStack SHALL raise a descriptive error at registration time.
-
-WHEN events flow through the system THEN type information SHALL be preserved throughout processing.
-
-Documentation SHALL clearly describe typing expectations.
-
-4. Non-Functional Requirements
-
-Code SHALL follow PEP 8 & type-check cleanly under mypy.
-
-Logging SHALL use structured JSON by default.
-
-Framework SHALL be dependency-light (Pydantic + Redis optional).
-
-Tests SHALL exist for:
-
-Event validation
-
-Organ handler dispatch
-
-Spine loop
-
-In-memory backend
-
-The codebase SHALL run on Python 3.11+.
-
-5. Phase Breakdown (Implementation Strategy)
-
-To support hackathon execution:
-
-MVP Phase:
-
-Event model
-
-Organ
-
-Spine
-
-In-memory backend
-
-Basic Redis XADD/XREAD backend
-
-Phase 2 (Post-hackathon):
-
-Full Redis Streams consumer groups
-
-Dead-letter queues
-
-Backoff policies
-
-Event replay
-
-Phase 3:
-
-Optional workflow DSL
-
-Optional OpenTelemetry integration
-
-Optional web studio
+1. Tests SHALL use pytest.
+2. Event tests SHALL cover validation, default fields, serialization.
+3. Spine tests SHALL cover routing, sync/async handling, max_steps.
+4. InMemoryBackend tests SHALL cover FIFO behavior.
+5. End-to-end tests SHALL verify full Organ chains for Séance & ETL demos.

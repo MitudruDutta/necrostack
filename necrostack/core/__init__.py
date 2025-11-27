@@ -1,4 +1,4 @@
-"""Core components of NecroStack."""
+"""Core components: Event, Organ, Spine."""
 
 from necrostack.core.event import Event
 from necrostack.core.organ import Organ

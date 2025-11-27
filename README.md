@@ -1,123 +1,113 @@
 # NecroStack
 
-Minimal async-first event-driven micro-framework for Python 3.11+.
+A minimal, async-first event-driven micro-framework for Python 3.11+.
+
+## What is NecroStack?
+
+NecroStack provides three core abstractions for building event-driven applications:
+
+- **Event** — An immutable, Pydantic-validated message with automatic ID and timestamp
+- **Organ** — A pluggable event handler that processes events and may emit new ones
+- **Spine** — A queue-driven dispatcher that routes events to Organs
 
 ## Features
 
-- **Event** — Typed, immutable, validated message objects using Pydantic 
-- **Organ** — Pluggable modules that listen to specific event types
-- **Spine** — Queue-based dispatcher that routes events to Organs
+- 🔄 Async-first design with sync handler support
+- ✅ Pydantic validation for type-safe events
+- 🔌 Pluggable backends (InMemory, Redis Streams)
+- 📝 Structured JSON logging
+- 🛡️ Loop protection with configurable max steps
+- 🎯 Simple, composable architecture
 
 ## Installation
 
 ```bash
+# Basic installation
 pip install necrostack
-```
 
-For Redis Streams backend support:
-
-```bash
+# With Redis support
 pip install necrostack[redis]
+
+# Development (editable mode)
+pip install -e ".[dev]"
 ```
 
-## Quick Start
+## Quickstart
 
 ```python
 import asyncio
-from necrostack import Event, Organ, Spine
-from necrostack.backends import InMemoryBackend
+from necrostack.core.event import Event
+from necrostack.core.organ import Organ
+from necrostack.core.spine import Spine
+from necrostack.backends.inmemory import InMemoryBackend
 
-# Define an event
-class UserCreated(Event):
-    event_type: str = "user.created"
+class GreetOrgan(Organ):
+    listens_to = ["GREET"]
 
-# Define an organ (handler)
-class WelcomeEmailOrgan(Organ):
-    listens_to = ["user.created"]
+    def handle(self, event: Event) -> Event:
+        name = event.payload.get("name", "World")
+        return Event(event_type="GREETED", payload={"message": f"Hello, {name}!"})
+
+class PrintOrgan(Organ):
+    listens_to = ["GREETED"]
 
     def handle(self, event: Event) -> None:
-        print(f"Sending welcome email for event {event.id}")
+        print(event.payload["message"])
 
-# Run the system
 async def main():
+    organs = [GreetOrgan(), PrintOrgan()]
     backend = InMemoryBackend()
-    spine = Spine(
-        organs=[WelcomeEmailOrgan()],
-        backend=backend,
-        max_steps=100
-    )
+    spine = Spine(organs=organs, backend=backend)
 
-    await spine.emit(UserCreated(payload={"user_id": "123"}))
-    await spine.run()
+    start_event = Event(event_type="GREET", payload={"name": "NecroStack"})
+    await spine.run(start_event)
 
 asyncio.run(main())
 ```
 
-## Core Concepts
+## Project Structure
 
-### Events
-
-Events are immutable Pydantic models with automatic ID and timestamp generation:
-
-```python
-from necrostack import Event
-
-class OrderPlaced(Event):
-    event_type: str = "order.placed"
-
-event = OrderPlaced(payload={"order_id": "456", "amount": 99.99})
-print(event.id)        # Auto-generated UUID
-print(event.timestamp) # Auto-generated datetime
 ```
-
-### Organs
-
-Organs are event handlers that declare which events they listen to:
-
-```python
-from necrostack import Organ, Event
-
-class InventoryOrgan(Organ):
-    listens_to = ["order.placed"]
-
-    async def handle(self, event: Event) -> Event | None:
-        # Process the event
-        # Optionally return new events to emit
-        return None
-```
-
-### Spine
-
-The Spine is the central dispatcher that routes events to organs:
-
-```python
-from necrostack import Spine
-from necrostack.backends import InMemoryBackend
-
-spine = Spine(
-    organs=[InventoryOrgan(), ShippingOrgan()],
-    backend=InMemoryBackend(),
-    max_steps=1000  # Prevent infinite loops
-)
+necrostack/
+├── core/           # Event, Organ, Spine
+├── backends/       # InMemoryBackend, RedisBackend
+├── utils/          # Helpers and utilities
+└── apps/           # Demo applications (Séance, ETL)
 ```
 
 ## Backends
 
-### In-Memory Backend (Development)
+### InMemoryBackend (Development)
+
+Simple async FIFO queue for development and testing:
 
 ```python
-from necrostack.backends import InMemoryBackend
+from necrostack.backends.inmemory import InMemoryBackend
 
 backend = InMemoryBackend()
 ```
 
-### Redis Streams Backend (Production)
+### RedisBackend (Production)
+
+Redis Streams backend for persistence and durability:
 
 ```python
-from necrostack.backends import RedisBackend
+from necrostack.backends.redis_backend import RedisBackend
 
-backend = RedisBackend(url="redis://localhost:6379", stream_key="events")
+backend = RedisBackend(redis_url="redis://localhost:6379", stream_key="necrostack:events")
 ```
+
+**MVP Limitations:**
+- No consumer group support (Phase 2)
+- `ack()` is a no-op
+- At-least-once semantics
+
+## Roadmap
+
+- [ ] Consumer group support for RedisBackend
+- [ ] Dead-letter queue
+- [ ] Retry & backoff logic
+- [ ] Metrics and observability hooks
 
 ## License
 

@@ -1,376 +1,496 @@
-# Design Document
+# Design Document — NecroStack
 
 ## Overview
 
-NecroStack is a minimal, async-first event-driven micro-framework for Python 3.11+. The architecture follows a simple pipeline pattern: Events flow through a Spine dispatcher which routes them to registered Organs based on event type. The framework prioritizes simplicity and clarity over feature richness.
+NecroStack is a minimal, async-first event-driven micro-framework for Python 3.11+. It revolves around three core abstractions:
 
-### Core Design Principles
+Event — an immutable, validated message
 
-1. **Minimal API Surface**: Three core classes (Event, Organ, Spine) with clear responsibilities
-2. **Async-First, Sync-Friendly**: Native async support with seamless sync handler execution
-3. **Pluggable Backends**: Abstract backend interface with in-memory and Redis implementations
-4. **Type Safety**: Full type hints with Pydantic v2 validation
-5. **No Magic**: Explicit registration via `listens_to`, no decorators or metaclass tricks
+Organ — a pluggable event handler
+
+Spine — a dispatcher that routes events to Organs and manages event flow
+
+Backends provide the event queue. Two are supported:
+
+InMemoryBackend — for development/testing
+
+RedisBackend — production durability (MVP-lite)
+
+The framework is designed for clarity, composability, and correctness, while offering enough structure to scale into real applications.
+
+The design prioritizes:
+- **Simplicity**: Three core abstractions (Event, Organ, Spine)
+- **Async-first**: Native async/await with sync compatibility
+- **Pluggability**: Swappable backends and composable Organs
+- **Production-minded**: Structured logging, loop protection, reconnection handling
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        Application                          │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────┐    ┌─────────┐    ┌─────────┐                │
-│  │ Event A │    │ Event B │    │ Event C │   (User Events)│
-│  └────┬────┘    └────┬────┘    └────┬────┘                │
-│       │              │              │                      │
-│       └──────────────┼──────────────┘                      │
-│                      ▼                                      │
-│              ┌───────────────┐                             │
-│              │    Spine      │  (Dispatcher)               │
-│              │  ┌─────────┐  │                             │
-│              │  │ Backend │  │  (Queue)                    │
-│              │  └─────────┘  │                             │
-│              └───────┬───────┘                             │
-│                      │                                      │
-│       ┌──────────────┼──────────────┐                      │
-│       ▼              ▼              ▼                      │
-│  ┌─────────┐    ┌─────────┐    ┌─────────┐                │
-│  │ Organ A │    │ Organ B │    │ Organ C │   (Handlers)   │
-│  └─────────┘    └─────────┘    └─────────┘                │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph "Application"
+        A[Events] --> S
+    end
+
+    subgraph "NecroStack Core"
+        S[Spine] --> O1[Organ 1]
+        S --> O2[Organ 2]
+        S --> O3[Organ N]
+        O1 --> |emit| S
+        O2 --> |emit| S
+        O3 --> |emit| S
+    end
+
+    subgraph "Backends"
+        S --> B[Backend Protocol]
+        B --> IM[InMemoryBackend]
+        B --> RB[RedisBackend]
+    end
+
+    subgraph "External Systems"
+        RB <--> RS[(Redis Streams)]
+    end
 ```
 
 ### Event Flow
 
-1. Application or Organ emits an Event
-2. Event is enqueued to the Backend
-3. Spine pulls Event from Backend
-4. Spine finds all Organs with matching `listens_to`
-5. Spine invokes each Organ's `handle()` method
-6. Returned Events are enqueued back to Backend
-7. Repeat until queue is empty or max_steps reached
+An Event is added to the backend via enqueue().
+
+The Spine begins a loop and calls backend.pull() to retrieve the next Event.
+
+The Spine identifies all Organs whose listens_to contains event.event_type.
+
+Each matching Organ’s handle() method is invoked (sync or async).
+
+If the handler returns new events, they are enqueued back into the backend.
+
+The loop continues until:
+
+no more events (timeout), or
+
+max_steps is exceeded (safety), or
+
+external stop (future extension).
 
 ## Components and Interfaces
 
-### Event (Base Class)
+### Event (`necrostack/core/event.py`)
 
 ```python
-from pydantic import BaseModel, Field
-from datetime import datetime
-from uuid import UUID, uuid4
+from pydantic import BaseModel, Field, field_validator
+from datetime import datetime, timezone
+from uuid import uuid4, UUID
 from typing import Any
 
 class Event(BaseModel):
-    """Base class for all events in NecroStack."""
-
-    model_config = {"frozen": True}
+    """Immutable, validated event message."""
 
     id: UUID = Field(default_factory=uuid4)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-    event_type: str = Field(..., description="String identifier used for routing")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    event_type: str
     payload: dict[str, Any] = Field(default_factory=dict)
 
-    def model_dump_jsonable(self) -> dict:
-        """Return a JSON-serializable representation."""
-        return self.model_dump()
+    model_config = {
+        "extra": "forbid",
+        "frozen": True,
+    }
+
+    @field_validator("event_type")
+    @classmethod
+    def validate_event_type(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("event_type must not be empty")
+        return v
 
 ```
 
-### Organ (Base Class)
+### Organ (`necrostack/core/organ.py`)
 
 ```python
 from abc import ABC, abstractmethod
-from typing import ClassVar, Sequence, Awaitable
-from .event import Event
+from typing import Awaitable, ClassVar
+from necrostack.core.event import Event
 
 class Organ(ABC):
-    """Base class for all event handlers."""
+    """Base class for event handlers."""
 
     listens_to: ClassVar[list[str]] = []
 
-    @abstractmethod
-    def handle(self, event: Event) -> (
-        Event | Sequence[Event] | None | Awaitable[Event | Sequence[Event] | None]
-    ):
-        """
-        Process an event.
+    def __init__(self, name: str | None = None):
+        self.name = name or self.__class__.__name__
 
-        May be:
-        - synchronous: return Event, list[Event], or None
-        - asynchronous: return awaitable resolving to same types
-        """
+    @abstractmethod
+    def handle(
+        self,
+        event: Event,
+    ) -> Event | list[Event] | None | Awaitable[Event | list[Event] | None]:
         ...
+
 ```
 
-### Backend (Protocol)
+### Spine (`necrostack/core/spine.py`)
+
+```python
+import inspect
+import logging
+from necrostack.core.event import Event
+from necrostack.core.organ import Organ
+from necrostack.backends.base import Backend
+
+class Spine:
+    """Central event dispatcher."""
+
+    def __init__(self, organs: list[Organ], backend: Backend, max_steps: int = 10_000):
+        self.organs = organs
+        self.backend = backend
+        self.max_steps = max_steps
+        self.log = logging.getLogger("necrostack.spine")
+        self._validate_organs()
+
+    def _validate_organs(self):
+        for organ in self.organs:
+            if not isinstance(organ.listens_to, list):
+                raise TypeError(f"{organ.name}.listens_to must be a list[str]")
+            if any(not isinstance(t, str) for t in organ.listens_to):
+                raise TypeError(f"{organ.name}.listens_to must contain only strings")
+
+    async def _invoke_handler(self, organ: Organ, event: Event):
+        result = organ.handle(event)
+        if inspect.iscoroutine(result):
+            return await result
+        return result
+
+    async def run(self, start_event: Event | None = None) -> None:
+        steps = 0
+
+        if start_event:
+            await self.backend.enqueue(start_event)
+
+        while True:
+            if steps >= self.max_steps:
+                raise RuntimeError("Max steps exceeded")
+            steps += 1
+
+            event = await self.backend.pull(timeout=1.0)
+
+            if event is None:
+                return
+
+            for organ in self.organs:
+                if event.event_type in organ.listens_to:
+                    self.log.info(
+                        f"Dispatching {event.event_type} to {organ.name}",
+                        extra={
+                            "event_id": str(event.id),
+                            "event_type": event.event_type,
+                            "organ": organ.name,
+                        },
+                    )
+
+                    emitted = await self._invoke_handler(organ, event)
+
+                    if emitted is None:
+                        continue
+
+                    if isinstance(emitted, Event):
+                        emitted = [emitted]
+
+                    for new_event in emitted:
+                        await self.backend.enqueue(new_event)
+
+```
+
+### Backend Protocol (`necrostack/backends/base.py`)
+
+```python
+from typing import Protocol
+from necrostack.core.event import Event
+
+class Backend(Protocol):
+    async def enqueue(self, event: Event) -> None: ...
+    async def pull(self, timeout: float = 1.0) -> Event | None: ...
+    async def ack(self, event: Event) -> None: ...
+
+```
+
+### InMemoryBackend (`necrostack/backends/inmemory.py`)
 
 ```python
 import asyncio
-from .base import Backend
-from ..core.event import Event
+from necrostack.core.event import Event
 
-class InMemoryBackend(Backend):
+class InMemoryBackend:
     """Async FIFO backend using asyncio.Queue."""
 
-    def __init__(self) -> None:
-        self._queue = asyncio.Queue()
+    def __init__(self):
+        self._queue: asyncio.Queue[Event] = asyncio.Queue()
 
     async def enqueue(self, event: Event) -> None:
         await self._queue.put(event)
 
-    async def pull(self, timeout: float | None = None) -> Event | None:
+    async def pull(self, timeout: float = 1.0) -> Event | None:
         try:
-            if timeout is None:
-                return await self._queue.get()
             return await asyncio.wait_for(self._queue.get(), timeout)
         except asyncio.TimeoutError:
             return None
 
     async def ack(self, event: Event) -> None:
-        """No-op for in-memory backend."""
-        return None
+        return None  # No durability guarantees
 
-    async def close(self) -> None:
-        while not self._queue.empty():
-            self._queue.get_nowait()
-
-        ...
 ```
 
-### Spine (Dispatcher)
+### RedisBackend (`necrostack/backends/redis_backend.py`)
 
 ```python
-import inspect
-import logging
-from typing import Sequence
-from .event import Event
-from .organ import Organ
-from .backends.base import Backend
+import json
+from redis.asyncio import Redis
+from necrostack.core.event import Event
 
-class Spine:
-    """Central event dispatcher."""
+class RedisBackend:
+    """Redis Streams backend (MVP-lite)."""
 
-    def __init__(self, organs: list[Organ], backend: Backend, max_steps: int | None = None) -> None:
-        self.organs = organs
-        self.backend = backend
-        self.max_steps = max_steps or 10_000
-        self._running = False
-        self.log = logging.getLogger("necrostack.spine")
+    def __init__(self, redis_url: str, stream_key: str = "necrostack:events"):
+        self.redis_url = redis_url
+        self.stream_key = stream_key
+        self._redis: Redis | None = None
+        self._last_id = "0"
 
-    async def emit(self, event: Event) -> None:
-        await self.backend.enqueue(event)
+    async def _get_client(self) -> Redis:
+        if self._redis is None:
+            self._redis = Redis.from_url(self.redis_url)
+        return self._redis
 
-    async def _invoke_handler(self, organ: Organ, event: Event):
-        handler = organ.handle
-        if inspect.iscoroutinefunction(handler):
-            return await handler(event)
-        else:
-            return handler(event)
+    async def enqueue(self, event: Event) -> None:
+        redis = await self._get_client()
+        await redis.xadd(
+            self.stream_key,
+            {"event": json.dumps(event.model_dump())}
+        )
 
-        ...
+    async def pull(self, timeout: float = 1.0) -> Event | None:
+        redis = await self._get_client()
+        resp = await redis.xread(
+            streams={self.stream_key: self._last_id},
+            count=1,
+            block=int(timeout * 1000),
+        )
+
+        if not resp:
+            return None
+
+        _, messages = resp[0]
+        message_id, raw = messages[0]
+        self._last_id = message_id
+
+        raw_event = json.loads(raw["event"])
+        return Event(**raw_event)
+
+    async def ack(self, event: Event) -> None:
+        """No-op in MVP. Phase 2: consumer groups."""
+        return None
+
 ```
 
 ## Data Models
 
 ### Event Schema
 
-| Field | Type | Description |
-|-------|------|-------------|
-| id | UUID | Unique identifier, auto-generated |
-| timestamp | datetime | Creation time, auto-generated |
-| event_type | str (ClassVar) | Event type identifier for routing |
-| (payload) | varies | User-defined fields via subclassing |
+| Field      | Type           | Description                      |
+| ---------- | -------------- | -------------------------------- |
+| id         | UUID           | Unique auto-generated identifier |
+| timestamp  | datetime (UTC) | Event creation time              |
+| event_type | str            | Routing key                      |
+| payload    | dict[str, Any] | Domain-specific data             |
 
-### Serialization Format
 
-Events serialize to JSON-compatible dictionaries:
+### Organ Registration
+
+Organs are registered with Spine at construction time. Spine validates:
+- Each organ's `listens_to` is a list of strings
+- No duplicate organ names (warning only)
+
+### Logging Format (Structured JSON)
 
 ```json
-# Redis stream entry format (JSON serialized)
 {
-    "event": "<JSON string from event.model_dump()>"
+  "timestamp": "2024-01-15T10:30:00Z",
+  "level": "INFO",
+  "event": "dispatch",
+  "event_id": "abc-123",
+  "event_type": "SUMMON_RITUAL",
+  "organ": "SummonSpirit",
+  "emitted": ["SPIRIT_APPEARED"]
 }
-
-```
-
-### Backend Message Format (Redis)
-
-```json
-await redis.xadd(
-    self.stream_key,
-    {"event": json.dumps(event.model_dump())}
-)
-
 ```
 
 
 
 ## Correctness Properties
 
-*A property is a characteristic or behavior that should hold true across all valid executions of a system-essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
+*A property is a characteristic or behavior that should hold true across all valid executions of a system—essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
 
 ### Property 1: Event Serialization Round-Trip
 
-*For any* valid Event instance, serializing to JSON and then deserializing should produce an Event that is equivalent to the original (same id, timestamp, event_type, and all payload fields).
+*For any* valid Event instance, serializing via `model_dump()` and then reconstructing via `Event(**data)` SHALL produce an equivalent Event with identical field values.
 
-**Validates: Requirements 1.4, 1.5**
+**Validates: Requirements 1.6, 1.7**
 
-### Property 2: Event Immutability and Auto-Fields
+### Property 2: Event ID Uniqueness
 
-*For any* valid Event created with user-provided payload data, the resulting Event should have a non-None UUID id, a non-None timestamp, and attempting to modify any field should raise an error (frozen model).
-
-**Validates: Requirements 1.3**
-
-### Property 3: Invalid Event Rejection
-
-*For any* Event subclass with required fields, instantiation with missing or type-invalid data should raise a Pydantic ValidationError.
+*For any* collection of Events created without explicit IDs, each Event SHALL have a unique, valid UUID string as its `id` field.
 
 **Validates: Requirements 1.2**
 
-### Property 4: Event Routing Correctness
+### Property 3: Empty Event Type Rejection
 
-*For any* Event with a given event_type and any set of Organs, the Spine should invoke the `handle()` method of exactly those Organs whose `listens_to` list contains that event_type.
+*For any* string that is empty or consists only of whitespace characters, attempting to create an Event with that string as `event_type` SHALL raise a validation error.
 
-**Validates: Requirements 2.2, 2.3, 3.3**
+**Validates: Requirements 1.4**
 
-### Property 5: Handler Return Value Processing
+### Property 4: Unknown Field Rejection
 
-*For any* Organ handler invocation, if the handler returns Event(s), those Events should be enqueued to the backend; if the handler returns None, no Events should be enqueued.
+*For any* Event creation attempt that includes fields not defined in the Event schema, the creation SHALL raise a validation error.
 
-**Validates: Requirements 2.6, 2.7**
+**Validates: Requirements 1.5**
 
-### Property 6: Organ Invocation Order
+### Property 5: Organ Name Defaulting
 
-*For any* Event that matches multiple Organs, the Spine should invoke their handlers in the exact order the Organs were provided to the Spine constructor (deterministic ordering).
+*For any* Organ subclass instantiated without an explicit `name` argument, the `name` attribute SHALL equal the class name.
 
-**Validates: Requirements 3.4**
+**Validates: Requirements 2.4**
 
-### Property 7: Error Resilience
+### Property 6: Organ listens_to Validation
 
-*For any* sequence of Events where some handlers raise exceptions, the Spine should continue processing subsequent Events (exceptions should not halt the processing loop).
+*For any* Organ whose `listens_to` attribute contains non-string elements, Spine registration SHALL raise a validation error.
+
+**Validates: Requirements 2.3**
+
+### Property 7: Event Routing Correctness
+
+*For any* Event with a given `event_type` and any set of Organs, the Spine SHALL invoke `handle()` on exactly those Organs whose `listens_to` list contains that `event_type`.
+
+**Validates: Requirements 3.3**
+
+### Property 8: Handler Return Enqueueing
+
+*For any* Organ handler that returns an Event or list of Events, the Spine SHALL enqueue all returned Events to the backend.
 
 **Validates: Requirements 3.5**
 
-### Property 8: Max-Steps Termination
+### Property 9: Organ Invocation Order
 
-*For any* Spine configured with max_steps=N, the processing loop should terminate after at most N event processing iterations, regardless of how many events are in the queue.
+*For any* ordered list of Organs registered with Spine, when multiple Organs match an event type, they SHALL be invoked in their registration order.
+
+**Validates: Requirements 3.6**
+
+### Property 10: Max Steps Enforcement
+
+*For any* Spine configured with `max_steps=N`, if the dispatch loop processes more than N events, the Spine SHALL raise `RuntimeError("Max steps exceeded")`.
 
 **Validates: Requirements 3.7**
 
-### Property 9: Backend FIFO Ordering
+### Property 11: Backend FIFO Ordering
 
-*For any* sequence of Events enqueued to the in-memory backend, dequeuing should return them in the same order they were enqueued (FIFO).
+*For any* sequence of Events enqueued to InMemoryBackend, pulling events SHALL return them in the same order they were enqueued (FIFO).
 
-**Validates: Requirements 4.2**
+**Validates: Requirements 5.2**
 
-### Property 10: Invalid Organ Signature Detection
+### Property 12: Backend Pull Timeout
 
-*For any* Organ subclass where the `handle()` method has an incorrect signature (wrong parameter count or types), registration with Spine should raise a descriptive error.
+*For any* empty InMemoryBackend, calling `pull(timeout=T)` SHALL return `None` after approximately T seconds without blocking indefinitely.
 
-**Validates: Requirements 7.2**
+**Validates: Requirements 5.3**
+
+### Property 13: Sync and Async Handler Support
+
+*For any* mix of synchronous and asynchronous Organ handlers, the Spine SHALL correctly invoke both types—awaiting async handlers and calling sync handlers directly.
+
+**Validates: Requirements 3.4**
 
 ## Error Handling
 
 ### Event Validation Errors
 
-- Pydantic `ValidationError` raised on invalid Event instantiation
-- Error includes field-level details for debugging
-- No partial Event objects created on validation failure
+- **Empty event_type**: Raises `pydantic.ValidationError` with message indicating event_type must not be empty
+- **Unknown fields**: Raises `pydantic.ValidationError` due to `extra="forbid"` configuration
+- **Invalid field types**: Raises `pydantic.ValidationError` with type coercion failure details
 
-### Handler Exceptions
+### Spine Errors
 
-- Exceptions in `handle()` are caught by Spine
-- Error is logged with event context (id, type)
-- Processing continues with next event
-- Failed events are not re-enqueued (MVP behavior)
+- **Max steps exceeded**: Raises `RuntimeError("Max steps exceeded")` when loop count exceeds `max_steps`
+- **Invalid Organ registration**: Raises `TypeError` if `listens_to` contains non-string elements
+- **Handler exceptions**: Logged and optionally re-raised (configurable); does not crash the dispatch loop by default
 
 ### Backend Errors
 
-- Connection failures trigger reconnection attempts (Redis)
-- Timeout on empty queue returns `None`, not exception
-- Backend close errors are logged but don't propagate
+- **InMemoryBackend**: No persistent errors; timeout returns `None`
+- **RedisBackend**: 
+  - Connection failures trigger automatic reconnection attempts
+  - Serialization errors raise `ValueError`
+  - Redis command failures logged and may raise `redis.RedisError`
 
-### Spine Lifecycle Errors
+  Framework guarantees:
 
-- Invalid Organ registration raises `TypeError` at init time
-- Duplicate event_type in single Organ is allowed
-- Empty organs list is valid (events are consumed but not processed)
+Validation errors bubble from Pydantic
+
+Handler exceptions logged (but don’t kill loop)
+
+Backend errors logged; Redis reconnects automatically
+
+Spine halts on:
+
+max_steps
+
+empty queue timeout
 
 ## Testing Strategy
 
-### Property-Based Testing Framework
+### Property-Based Testing
 
-The project will use **Hypothesis** for property-based testing. Hypothesis is the standard PBT library for Python with excellent Pydantic integration.
+The project SHALL use **Hypothesis** as the property-based testing library. Each correctness property SHALL be implemented as a Hypothesis test with a minimum of 100 iterations.
 
-Configuration:
-- Minimum 100 examples per property test
-- Explicit seed logging for reproducibility
-- Custom strategies for Event and Organ generation
+Property tests SHALL be annotated with the format:
+```python
+# **Feature: necrostack-framework, Property N: Property Name**
+# **Validates: Requirements X.Y**
+```
+
+### Unit Testing
+
+Unit tests SHALL cover:
+- Event model instantiation with various field combinations
+- Organ subclass creation and registration
+- Spine construction and configuration
+- Backend method behavior (enqueue, pull, ack)
+- Error conditions and edge cases
+
+### Integration Testing
+
+Integration tests SHALL verify:
+- Complete Séance demo event chain (SUMMON_RITUAL → printed output)
+- Complete ETL demo event chain (ETL_START → printed summary)
+- Mixed sync/async Organ pipelines
+- Backend swapping (same Organs, different backends)
 
 ### Test Organization
 
 ```
 tests/
-├── conftest.py              # Shared fixtures and strategies
-├── test_event.py            # Event validation and serialization
-├── test_organ.py            # Organ registration and handling
-├── test_spine.py            # Dispatcher logic and lifecycle
-├── test_backend_memory.py   # In-memory backend
-└── test_backend_redis.py    # Redis backend (integration)
+├── test_event.py          # Event model tests
+├── test_organ.py          # Organ base class tests
+├── test_spine.py          # Spine dispatcher tests
+├── test_inmemory.py       # InMemoryBackend tests
+├── test_redis.py          # RedisBackend tests (requires Redis)
+├── test_seance_flow.py    # Séance integration test
+└── test_etl_flow.py       # ETL integration test
 ```
 
-### Property Test Annotations
-
-Each property-based test must include a comment linking to the design document:
+### Test Configuration
 
 ```python
-# **Feature: necrostack-framework, Property 1: Event Serialization Round-Trip**
-@given(event=valid_events())
-def test_event_round_trip(event: Event):
-    ...
-```
+# conftest.py
+from hypothesis import settings
 
-### Unit Tests
-
-Unit tests complement property tests for:
-- Specific edge cases (empty strings, boundary values)
-- Integration points (Redis connection handling)
-- Error message verification
-- Async/sync handler execution paths
-
-### Test Coverage Goals
-
-- All correctness properties implemented as Hypothesis tests
-- Critical paths have unit test coverage
-- Redis tests run against real Redis (not mocked) in CI
-
-## Project Structure
-
-```
-necrostack/
-├── __init__.py              # Public API exports
-├── core/
-│   ├── __init__.py
-│   ├── event.py             # Event base class
-│   ├── organ.py             # Organ base class
-│   └── spine.py             # Spine dispatcher
-├── backends/
-│   ├── __init__.py
-│   ├── base.py              # Backend protocol
-│   ├── memory.py            # In-memory backend
-│   └── redis.py             # Redis Streams backend
-└── py.typed                 # PEP 561 marker
-
-tests/
-├── conftest.py
-├── test_event.py
-├── test_organ.py
-├── test_spine.py
-├── test_backend_memory.py
-└── test_backend_redis.py
-
-pyproject.toml
-README.md
-.gitignore
+settings.register_profile("ci", max_examples=100)
+settings.register_profile("dev", max_examples=20)
 ```

@@ -5,13 +5,11 @@ build-backend = "hatchling.build"
 [project]
 name = "necrostack"
 version = "0.1.0"
-description = "Minimal async-first event-driven micro-framework for Python 3.11+"
+description = "Async-first event-driven micro-framework for Python"
 readme = "README.md"
-license = "MIT"
 requires-python = ">=3.11"
-authors = [
-    { name = "NecroStack Team" }
-]
+license = "MIT"
+keywords = ["event-driven", "async", "framework", "microservices"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -27,24 +25,30 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-redis = [
-    "redis>=5.0",
-]
+redis = ["redis>=5.0"]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "hypothesis>=6.100",
-    "mypy>=1.0",
+    "ruff>=0.4",
+    "black>=24.0",
 ]
+all = ["necrostack[redis,dev]"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-pythonpath = ["."]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
 
-[tool.hypothesis]
-max_examples = 100
+[tool.ruff]
+target-version = "py311"
+line-length = 100
 
-[tool.mypy]
-python_version = "3.11"
-strict = true
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = []
+
+[tool.black]
+target-version = ["py311"]
+line-length = 100

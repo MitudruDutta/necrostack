@@ -1,13 +1,6 @@
-"""Backend implementations for NecroStack."""
+"""Backend implementations for event queuing."""
 
 from necrostack.backends.base import Backend
-from necrostack.backends.memory import InMemoryBackend
+from necrostack.backends.inmemory import InMemoryBackend
 
 __all__ = ["Backend", "InMemoryBackend"]
-
-# Conditionally export RedisBackend if redis is installed
-try:
-    from necrostack.backends.redis import RedisBackend
-    __all__.append("RedisBackend")
-except ImportError:
-    pass

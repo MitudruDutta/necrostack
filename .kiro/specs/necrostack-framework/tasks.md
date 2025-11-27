@@ -1,125 +1,209 @@
-# Implementation Plan
+# Implementation Plan — NecroStack 
 
-- [x] 1. Set up project structure and packaging
-  - [x] 1.1 Create project skeleton with pyproject.toml
-    - Create `necrostack/` package directory structure
-    - Create `pyproject.toml` with metadata, dependencies (pydantic), and optional redis extra
-    - Create `README.md` with project overview and features
-    - Create `.gitignore` for Python projects
-    - Add `py.typed` marker for PEP 561
-    - _Requirements: 6.1, 6.2, 6.3_
-
-  - [x] 1.2 Set up testing infrastructure
-    - Create `tests/` directory with `conftest.py`
-    - Configure pytest and hypothesis in pyproject.toml
-    - Create Hypothesis strategies for Event generation
-    - _Requirements: 7.1_
+- [x] 1. Project scaffolding and configuration
+  - [x] 1.1 Create project structure and pyproject.toml
+    - Create directory structure: `necrostack/core/`, `necrostack/backends/`, `necrostack/utils/`, `necrostack/apps/`
+    - Create `pyproject.toml` with modern Python packaging (Python 3.11+, pydantic, redis dependencies)
+    - Add ruff/black configuration to `pyproject.toml` for consistent formatting
+    - Create `.gitignore` for Python artifacts
+    - Create initial `README.md` with project overview
+    - Add `__init__.py` files for all packages
+    - _Requirements: 7.1, 7.2, 7.3, 7.4_
+  - [x] 1.2 Configure structured JSON logging
+    - Create `necrostack/core/logging.py` with JSON formatter
+    - Define standard log fields: timestamp, level, event_id, event_type, organ, emitted
+    - Enforce UTC ISO8601 timestamps in log formatter (e.g., `2024-01-15T10:30:00Z`)
+    - Configure default logger for Spine
+    - _Supports: Structured logging as specified in design document_
+  - [x] 1.3 Set up pytest and Hypothesis configuration
+    - Create `tests/conftest.py` with Hypothesis profiles (ci=100, dev=20)
+    - Add pytest configuration to `pyproject.toml`
+    - _Supports: Test infrastructure setup_
 
 - [x] 2. Implement Event model
-  - [x] 2.1 Create Event base class
-    - Implement `Event` class with `id`, `timestamp`, `event_type`, `payload` fields
-    - Configure Pydantic frozen model for immutability
-    - Add `model_dump_jsonable()` method for serialization
-    - _Requirements: 1.1, 1.3, 1.4_
-
-  - [x] 2.2 Write property test for Event serialization round-trip
-    - **Property 1: Event Serialization Round-Trip**
-    - **Validates: Requirements 1.4, 1.5**
-
-  - [x] 2.3 Write property test for Event immutability and auto-fields
-    - **Property 2: Event Immutability and Auto-Fields**
-    - **Validates: Requirements 1.3**
-
-  - [x] 2.4 Write property test for invalid Event rejection
-    - **Property 3: Invalid Event Rejection**
-    - **Validates: Requirements 1.2**
+  - [x] 2.1 Create Event class with Pydantic validation
+    - Implement `necrostack/core/event.py` with `Event(BaseModel)`
+    - Fields: `id: str` (generated as UUID string), `timestamp: datetime`, `event_type: str`, `payload: dict[str, Any]`
+    - Configure `extra="forbid"` and `frozen=True`
+    - Add `field_validator` ensuring `event_type` is non-empty and not whitespace-only
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
 - [x] 3. Implement Organ base class
-  - [x] 3.1 Create Organ abstract base class
-    - Implement `Organ` ABC with `listens_to` class variable
-    - Define abstract `handle()` method with flexible return type
-    - _Requirements: 2.1, 2.2_
+  - [x] 3.1 Create Organ ABC with handle method
+    - Implement `necrostack/core/organ.py` with `Organ(ABC)`
+    - Class attribute `listens_to: ClassVar[list[str]] = []` (declare-only, no validation here)
+    - Constructor with optional `name` parameter defaulting to class name
+    - Abstract `handle(self, event: Event)` method
+    - Note: Validation of `listens_to` happens in Spine, not Organ
+    - _Requirements: 2.1, 2.2, 2.4, 2.5, 2.6, 2.7_
 
-- [ ] 4. Implement Backend protocol and in-memory backend
+- [x] 4. Implement Backend protocol and InMemoryBackend
   - [x] 4.1 Create Backend protocol
-    - Define `Backend` protocol with `enqueue`, `pull`, `ack`, `close` methods
-    - _Requirements: 4.1_
-
+    - Implement `necrostack/backends/base.py` with `Backend(Protocol)`
+    - Define async methods: `enqueue(Event)`, `pull(timeout)`, `ack(Event)`
+    - Document that ALL queue logic lives in backends, not Spine
+    - _Requirements: 4.1, 4.2, 4.3, 4.4_
   - [x] 4.2 Implement InMemoryBackend
-    - Create `InMemoryBackend` using `asyncio.Queue`
-    - Implement FIFO enqueue/pull with timeout support
-    - Implement `close()` to clear queue
-    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
-
-  - [x] 4.3 Write property test for Backend FIFO ordering
-    - **Property 9: Backend FIFO Ordering**
-    - **Validates: Requirements 4.2**
+    - Implement `necrostack/backends/inmemory.py`
+    - Use `asyncio.Queue` for FIFO storage (queue lives here, not in Spine)
+    - Implement `enqueue`, `pull` (with timeout), and `ack` (no-op)
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
 - [x] 5. Implement Spine dispatcher
-  - [x] 5.1 Create Spine class with organ registration
-    - Implement `Spine.__init__()` accepting organs, backend, max_steps
-    - Build internal routing table from organ `listens_to`
-    - Validate organ handler signatures at registration
-    - _Requirements: 3.1, 7.2_
+  - [x] 5.1 Create Spine class with organ validation
+    - Implement `necrostack/core/spine.py`
+    - Constructor accepting `organs`, `backend`, `max_steps`
+    - Validate `listens_to` contains only strings during Spine registration (not in Organ)
+    - Spine does NOT have internal queue - all queue operations go through backend
+    - _Requirements: 3.1, 2.3_
+  - [x] 5.2 Implement async run loop with event routing
+    - Implement `run(start_event)` method
+    - Pull events from backend via `backend.pull()` (no internal deque)
+    - Route to matching organs based on `event_type` in `listens_to`
+    - Handle sync and async handlers via `inspect.iscoroutine`
+    - Enqueue returned events back to backend via `backend.enqueue()`
+    - Add structured JSON logging for dispatch operations
+    - _Requirements: 3.2, 3.3, 3.4, 3.5, 3.6_
+    - _Supports: Structured logging as defined in Design Document_
+  - [x] 5.3 Implement max_steps enforcement and error handling
+    - Track step count and raise `RuntimeError("Max steps exceeded")` when exceeded
+    - Catch and log handler exceptions without crashing the loop
+    - Catch and log backend exceptions gracefully
+    - On `backend.pull(timeout)` returning None, Spine SHALL continue the loop until explicitly stopped (timeout means "no event yet", not shutdown)
+    - _Requirements: 3.7_
+    - _Supports: Error-handling behavior from Design Document, structured logging_
 
-  - [x] 5.2 Write property test for invalid Organ signature detection
-    - **Property 10: Invalid Organ Signature Detection**
-    - **Validates: Requirements 7.2**
-
-  - [x] 5.3 Implement event emission and handler invocation
-    - Implement `emit()` to enqueue events
-    - Implement `_invoke_handler()` supporting sync and async handlers
-    - Handle handler return values (Event, list, None)
-    - _Requirements: 2.3, 2.4, 2.5, 2.6, 2.7_
-
-  - [x] 5.4 Write property test for Event routing correctness
-    - **Property 4: Event Routing Correctness**
-    - **Validates: Requirements 2.2, 2.3, 3.3**
-
-  - [x] 5.5 Write property test for handler return value processing
-    - **Property 5: Handler Return Value Processing**
-    - **Validates: Requirements 2.6, 2.7**
-
-  - [x] 5.6 Implement main processing loop
-    - Implement `run()` with event pull/dispatch loop
-    - Add max_steps guard for loop termination
-    - Implement graceful `stop()` method
-    - _Requirements: 3.2, 3.6, 3.7_
-
-  - [x] 5.7 Write property test for Organ invocation order
-    - **Property 6: Organ Invocation Order**
-    - **Validates: Requirements 3.4**
-
-  - [x] 5.8 Implement error handling in processing loop
-    - Catch and log handler exceptions
-    - Continue processing after handler failures
-    - _Requirements: 3.5_
-
-  - [x] 5.9 Write property test for error resilience
-    - **Property 7: Error Resilience**
-    - **Validates: Requirements 3.5**
-
-  - [x] 5.10 Write property test for max-steps termination
-    - **Property 8: Max-Steps Termination**
-    - **Validates: Requirements 3.7**
-
-- [x] 6. Checkpoint - Ensure all tests pass
+- [ ] 6. Checkpoint - Verify core implementation works
+  - Run sample code manually to verify Event, Organ, Backend, Spine work together
   - Ensure all tests pass, ask the user if questions arise.
 
-- [x] 7. Implement Redis Streams backend (MVP-Light)
-  - [x] 7.1 Create RedisBackend class
-    - Implement connection to Redis using redis-py async client
-    - Implement `enqueue()` using XADD
-    - Implement `pull()` using XREAD with blocking timeout
-    - Implement `ack()` as no-op for MVP
-    - Implement `close()` to close connection
-    - _Requirements: 5.1, 5.2, 5.3, 5.4_
+- [ ] 7. Write property tests for Event model
+  - [ ] 7.1 Write property test for Event serialization round-trip
+    - **Property 1: Event Serialization Round-Trip**
+    - **Validates: Requirements 1.6, 1.7**
+  - [ ] 7.2 Write property test for Event ID uniqueness
+    - **Property 2: Event ID Uniqueness**
+    - **Validates: Requirements 1.2**
+  - [ ] 7.3 Write property test for empty event_type rejection
+    - **Property 3: Empty Event Type Rejection**
+    - **Validates: Requirements 1.4**
+  - [ ] 7.4 Write property test for unknown field rejection
+    - **Property 4: Unknown Field Rejection**
+    - **Validates: Requirements 1.5**
 
-  - [x] 7.2 Write integration tests for Redis backend
-    - Test enqueue/pull round-trip with real Redis
-    - Test timeout behavior on empty stream
-    - Test connection handling
-    - _Requirements: 5.1, 5.2, 5.3_
+- [ ] 8. Write property tests for Organ and Backend
+  - [ ] 8.1 Write property test for Organ name defaulting
+    - **Property 5: Organ Name Defaulting**
+    - **Validates: Requirements 2.4**
+  - [ ] 8.2 Write property test for Backend FIFO ordering
+    - **Property 11: Backend FIFO Ordering**
+    - **Validates: Requirements 5.2**
+  - [ ] 8.3 Write property test for Backend pull timeout
+    - **Property 12: Backend Pull Timeout**
+    - **Validates: Requirements 5.3**
+  - [ ] 8.4 Write smoke test for structured logging output shape
+    - Dispatch an event through Spine using InMemoryBackend with at least one async handler
+    - Capture logs via `caplog` or custom handler
+    - Verify logs contain required fields (event_id, event_type, organ) for one dispatch
+    - Verify logger does not crash Spine during async await behavior
+    - _Supports: Structured logging as defined in Design Document_
 
-- [x] 8. Final Checkpoint - Ensure all tests pass
+- [ ] 9. Write property tests for Spine dispatcher
+  - [ ] 9.1 Write property test for Organ listens_to validation
+    - **Property 6: Organ listens_to Validation**
+    - **Validates: Requirements 2.3**
+  - [ ] 9.2 Write property test for event routing correctness
+    - **Property 7: Event Routing Correctness**
+    - **Validates: Requirements 3.3**
+  - [ ] 9.3 Write property test for handler return enqueueing
+    - **Property 8: Handler Return Enqueueing**
+    - **Validates: Requirements 3.5**
+  - [ ] 9.4 Write property test for organ invocation order
+    - **Property 9: Organ Invocation Order**
+    - **Validates: Requirements 3.6**
+  - [ ] 9.5 Write property test for max steps enforcement
+    - **Property 10: Max Steps Enforcement**
+    - **Validates: Requirements 3.7**
+  - [ ] 9.6 Write property test for sync and async handler support
+    - **Property 13: Sync and Async Handler Support**
+    - **Validates: Requirements 3.4**
+  - [ ] 9.7 Write test asserting Spine never stores events internally
+    - Verify Spine has no attributes that maintain an event queue or buffer (e.g., no list, deque, FIFO structure)
+    - Spine may store the currently processing event or metadata, but not a persistent list of events
+    - Ensures all queue logic remains in Backend
+    - _Supports: Architecture invariant from Design Document_
+
+- [ ] 10. Checkpoint - Ensure all property tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 11. Implement RedisBackend (MVP-lite)
+  - [ ] 11.1 Create RedisBackend with Redis Streams
+    - Implement `necrostack/backends/redis_backend.py`
+    - Constructor accepting `redis_url` and `stream_key`
+    - Implement `enqueue` using `XADD`
+    - Implement `pull` using `XREAD` with blocking timeout
+    - Implement `ack` as no-op (MVP)
+    - Add auto-reconnect logic
+    - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
+  - [ ] 11.2 Create docker-compose.yml for Redis testing (optional)
+    - Add `docker-compose.yml` in project root with Redis service
+    - Document how to run Redis tests locally
+    - Tests should use `pytest.mark.skipif()` with a utility that checks Redis availability
+    - _Requirements: 6.2, 6.3_
+
+- [ ] 12. Implement Séance demo application
+  - [ ] 12.1 Create Séance organs (app-specific, not in core)
+    - Create `necrostack/apps/seance/organs/` directory
+    - Implement `SummonSpirit` organ (SUMMON_RITUAL → SPIRIT_APPEARED)
+    - Implement `AskQuestion` organ (SPIRIT_APPEARED → ANSWER_GENERATED)
+    - Implement `InterpretResponse` organ (ANSWER_GENERATED → OMEN_REVEALED)
+    - Implement `ManifestEffect` organ (OMEN_REVEALED → print output)
+    - _Requirements: 8.2, 8.3, 8.4, 8.5_
+  - [ ] 12.2 Create Séance app entrypoint
+    - Implement `necrostack/apps/seance/main.py`
+    - Wire up organs with Spine and InMemoryBackend
+    - Start with SUMMON_RITUAL event
+    - _Requirements: 8.1, 8.3_
+  - [ ] 12.3 Write integration test for Séance flow
+    - Verify complete event chain execution
+    - _Requirements: 8.1_
+
+- [ ] 13. Implement ETL demo application
+  - [ ] 13.1 Create ETL organs (app-specific, not in core)
+    - Create `necrostack/apps/etl/organs/` directory
+    - Implement `ExtractCSV` organ (ETL_START → RAW_DATA_LOADED)
+    - Implement `CleanData` organ (RAW_DATA_LOADED → DATA_CLEANED)
+    - Implement `TransformData` organ (DATA_CLEANED → DATA_TRANSFORMED)
+    - Implement `ExportSummary` organ (DATA_TRANSFORMED → print summary)
+    - _Requirements: 9.2, 9.3, 9.4, 9.5_
+  - [ ] 13.2 Create ETL app entrypoint
+    - Implement `necrostack/apps/etl/main.py`
+    - Wire up organs with Spine and InMemoryBackend
+    - Include embedded sample CSV data
+    - _Requirements: 9.1_
+  - [ ] 13.3 Write integration test for ETL flow
+    - Verify complete data pipeline execution
+    - _Requirements: 9.1_
+
+- [ ] 14. Checkpoint - Ensure demo apps work
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 15. Update README and documentation
+  - [ ] 15.1 Update README with full documentation
+    - Add "What is NecroStack?" section
+    - Add features list (Event/Organ/Spine, async dispatch, backends, demos)
+    - Add installation instructions (`pip install necrostack` or editable mode)
+    - Add quickstart code example
+    - Document Redis backend behavior and limitations (no consumer groups in MVP, at-least-once semantics)
+    - Add roadmap section
+    - _Requirements: 7.4_
+
+- [ ] 16. Set up CI (optional)
+  - [ ] 16.1 Create GitHub Actions workflow
+    - Add `.github/workflows/ci.yml`
+    - Run pytest with Hypothesis CI profile
+    - Skip Redis tests in CI (or use service container)
+    - Run linting (ruff/black optional)
+
+- [ ] 17. Final Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
