@@ -1,0 +1,15 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+# Usage:
+#   Start Redis:     docker-compose up -d
+#   Stop Redis:      docker-compose down
+#   Run Redis tests: pytest tests/test_redis.py -v

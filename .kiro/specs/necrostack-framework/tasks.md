@@ -108,36 +108,36 @@
     - Verify logger does not crash Spine during async await behavior
     - _Supports: Structured logging as defined in Design Document_
 
-- [ ] 9. Write property tests for Spine dispatcher
-  - [ ] 9.1 Write property test for Organ listens_to validation
+- [x] 9. Write property tests for Spine dispatcher
+  - [x] 9.1 Write property test for Organ listens_to validation
     - **Property 6: Organ listens_to Validation**
     - **Validates: Requirements 2.3**
-  - [ ] 9.2 Write property test for event routing correctness
+  - [x] 9.2 Write property test for event routing correctness
     - **Property 7: Event Routing Correctness**
     - **Validates: Requirements 3.3**
-  - [ ] 9.3 Write property test for handler return enqueueing
+  - [x] 9.3 Write property test for handler return enqueueing
     - **Property 8: Handler Return Enqueueing**
     - **Validates: Requirements 3.5**
-  - [ ] 9.4 Write property test for organ invocation order
+  - [x] 9.4 Write property test for organ invocation order
     - **Property 9: Organ Invocation Order**
     - **Validates: Requirements 3.6**
-  - [ ] 9.5 Write property test for max steps enforcement
+  - [x] 9.5 Write property test for max steps enforcement
     - **Property 10: Max Steps Enforcement**
     - **Validates: Requirements 3.7**
-  - [ ] 9.6 Write property test for sync and async handler support
+  - [x] 9.6 Write property test for sync and async handler support
     - **Property 13: Sync and Async Handler Support**
     - **Validates: Requirements 3.4**
-  - [ ] 9.7 Write test asserting Spine never stores events internally
+  - [x] 9.7 Write test asserting Spine never stores events internally
     - Verify Spine has no attributes that maintain an event queue or buffer (e.g., no list, deque, FIFO structure)
     - Spine may store the currently processing event or metadata, but not a persistent list of events
     - Ensures all queue logic remains in Backend
     - _Supports: Architecture invariant from Design Document_
 
-- [ ] 10. Checkpoint - Ensure all property tests pass
+- [x] 10. Checkpoint - Ensure all property tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 11. Implement RedisBackend (MVP-lite)
-  - [ ] 11.1 Create RedisBackend with Redis Streams
+- [x] 11. Implement RedisBackend (MVP-lite)
+  - [x] 11.1 Create RedisBackend with Redis Streams
     - Implement `necrostack/backends/redis_backend.py`
     - Constructor accepting `redis_url` and `stream_key`
     - Implement `enqueue` using `XADD`
@@ -145,7 +145,7 @@
     - Implement `ack` as no-op (MVP)
     - Add auto-reconnect logic
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
-  - [ ] 11.2 Create docker-compose.yml for Redis testing (optional)
+  - [x] 11.2 Create docker-compose.yml for Redis testing (optional)
     - Add `docker-compose.yml` in project root with Redis service
     - Document how to run Redis tests locally
     - Tests should use `pytest.mark.skipif()` with a utility that checks Redis availability
