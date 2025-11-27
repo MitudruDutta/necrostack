@@ -47,4 +47,4 @@ class InMemoryBackend:
         Args:
             event: The Event to acknowledge.
         """
-        return None
+        pass

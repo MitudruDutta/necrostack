@@ -23,7 +23,8 @@ class Event(BaseModel):
     @field_validator("event_type")
     @classmethod
     def validate_event_type(cls, v: str) -> str:
-        """Ensure event_type is non-empty and not whitespace-only."""
-        if not v or not v.strip():
+        """Ensure event_type is non-empty, not whitespace-only, and strip whitespace."""
+        v = v.strip()
+        if not v:
             raise ValueError("event_type must not be empty")
         return v

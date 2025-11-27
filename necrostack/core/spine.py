@@ -9,9 +9,12 @@ IMPORTANT: Spine does NOT maintain any internal queue. All queue operations
 go through the backend.
 """
 
+import asyncio
 import inspect
 import logging
-from typing import TYPE_CHECKING
+from collections import defaultdict
+from enum import Enum
+from typing import TYPE_CHECKING, Protocol
 
 from necrostack.core.event import Event
 from necrostack.core.logging import configure_spine_logger
@@ -19,6 +22,38 @@ from necrostack.core.organ import Organ
 
 if TYPE_CHECKING:
     from necrostack.backends.base import Backend
+
+
+class EnqueueFailureMode(Enum):
+    """Strategy for handling enqueue failures."""
+
+    FAIL = "fail"  # Re-raise exception to stop processing
+    RETRY = "retry"  # Retry with exponential backoff before failing
+    STORE = "store"  # Store in dead-letter store for later retry
+
+
+class FailedEventStore(Protocol):
+    """Protocol for storing failed events for later retry."""
+
+    async def store(self, event: Event, error: Exception) -> None:
+        """Store a failed event.
+
+        Args:
+            event: The Event that failed to enqueue.
+            error: The exception that caused the failure.
+        """
+        ...
+
+
+class InMemoryFailedEventStore:
+    """Simple in-memory failed event store for testing."""
+
+    def __init__(self) -> None:
+        self.events: list[tuple[Event, Exception]] = []
+
+    async def store(self, event: Event, error: Exception) -> None:
+        """Store a failed event in memory."""
+        self.events.append((event, error))
 
 
 class Spine:
@@ -32,6 +67,10 @@ class Spine:
         organs: List of Organ instances to dispatch events to.
         backend: The Backend implementation for event queuing.
         max_steps: Maximum number of events to process before raising RuntimeError.
+        enqueue_failure_mode: Strategy for handling enqueue failures.
+        failed_event_store: Store for failed events (used with STORE mode).
+        retry_attempts: Number of retry attempts (used with RETRY mode).
+        retry_base_delay: Base delay in seconds for exponential backoff.
     """
 
     def __init__(
@@ -39,6 +78,10 @@ class Spine:
         organs: list[Organ],
         backend: "Backend",
         max_steps: int = 10_000,
+        enqueue_failure_mode: EnqueueFailureMode = EnqueueFailureMode.STORE,
+        failed_event_store: FailedEventStore | None = None,
+        retry_attempts: int = 3,
+        retry_base_delay: float = 0.1,
     ) -> None:
         """Initialize the Spine dispatcher.
 
@@ -46,6 +89,11 @@ class Spine:
             organs: List of Organ instances to register.
             backend: Backend implementation for event queuing.
             max_steps: Maximum events to process (default 10,000).
+            enqueue_failure_mode: Strategy for handling enqueue failures.
+            failed_event_store: Store for failed events. If None and mode is STORE,
+                an InMemoryFailedEventStore is created.
+            retry_attempts: Number of retry attempts for RETRY mode (default 3).
+            retry_base_delay: Base delay in seconds for exponential backoff (default 0.1).
 
         Raises:
             TypeError: If any organ's listens_to is not a list of strings.
@@ -53,8 +101,13 @@ class Spine:
         self.organs = organs
         self.backend = backend
         self.max_steps = max_steps
+        self.enqueue_failure_mode = enqueue_failure_mode
+        self.failed_event_store = failed_event_store or InMemoryFailedEventStore()
+        self.retry_attempts = retry_attempts
+        self.retry_base_delay = retry_base_delay
         self._log = configure_spine_logger()
         self._running = False
+        self._enqueue_failures: dict[str, int] = defaultdict(int)
 
         # Validate organs during registration (Requirements 2.3, 3.1)
         self._validate_organs()
@@ -100,6 +153,103 @@ class Spine:
     def stop(self) -> None:
         """Signal the Spine to stop processing after the current event."""
         self._running = False
+
+    def get_enqueue_failure_count(self, event_type: str | None = None) -> int:
+        """Get the count of enqueue failures.
+
+        Args:
+            event_type: If provided, return failures for this event type only.
+                If None, return total failures across all event types.
+
+        Returns:
+            The number of enqueue failures.
+        """
+        if event_type is not None:
+            return self._enqueue_failures.get(event_type, 0)
+        return sum(self._enqueue_failures.values())
+
+    async def _handle_enqueue_failure(self, event: Event, error: Exception) -> None:
+        """Handle an enqueue failure according to the configured strategy.
+
+        Args:
+            event: The Event that failed to enqueue.
+            error: The exception that caused the failure.
+
+        Raises:
+            Exception: Re-raises the error if mode is FAIL or RETRY exhausted.
+        """
+        # Increment metrics counter
+        self._enqueue_failures[event.event_type] += 1
+
+        if self.enqueue_failure_mode == EnqueueFailureMode.FAIL:
+            self._log.error(
+                f"Enqueue failed (mode=fail), stopping: {error}",
+                extra={
+                    "event_id": str(event.id),
+                    "event_type": event.event_type,
+                    "error": str(error),
+                    "failure_mode": "fail",
+                    "total_failures": self._enqueue_failures[event.event_type],
+                },
+            )
+            raise error
+
+        elif self.enqueue_failure_mode == EnqueueFailureMode.RETRY:
+            last_error = error
+            for attempt in range(self.retry_attempts):
+                delay = self.retry_base_delay * (2**attempt)
+                self._log.warning(
+                    f"Enqueue failed, retrying in {delay}s (attempt {attempt + 1}/{self.retry_attempts})",
+                    extra={
+                        "event_id": str(event.id),
+                        "event_type": event.event_type,
+                        "error": str(last_error),
+                        "failure_mode": "retry",
+                        "attempt": attempt + 1,
+                        "max_attempts": self.retry_attempts,
+                        "delay": delay,
+                    },
+                )
+                await asyncio.sleep(delay)
+                try:
+                    await self.backend.enqueue(event)
+                    self._log.info(
+                        f"Enqueue succeeded on retry attempt {attempt + 1}",
+                        extra={
+                            "event_id": str(event.id),
+                            "event_type": event.event_type,
+                            "attempt": attempt + 1,
+                        },
+                    )
+                    return
+                except Exception as e:
+                    last_error = e
+
+            # All retries exhausted
+            self._log.error(
+                f"Enqueue failed after {self.retry_attempts} retries: {last_error}",
+                extra={
+                    "event_id": str(event.id),
+                    "event_type": event.event_type,
+                    "error": str(last_error),
+                    "failure_mode": "retry",
+                    "total_failures": self._enqueue_failures[event.event_type],
+                },
+            )
+            raise last_error
+
+        else:  # STORE mode
+            self._log.warning(
+                f"Enqueue failed, storing in dead-letter store: {error}",
+                extra={
+                    "event_id": str(event.id),
+                    "event_type": event.event_type,
+                    "error": str(error),
+                    "failure_mode": "store",
+                    "total_failures": self._enqueue_failures[event.event_type],
+                },
+            )
+            await self.failed_event_store.store(event, error)
 
     async def run(self, start_event: Event | None = None) -> None:
         """Run the event dispatch loop.
@@ -184,14 +334,7 @@ class Spine:
                                 await self.backend.enqueue(new_event)
                                 emitted_types.append(new_event.event_type)
                             except Exception as e:
-                                self._log.error(
-                                    f"Failed to enqueue event: {e}",
-                                    extra={
-                                        "event_id": str(new_event.id),
-                                        "event_type": new_event.event_type,
-                                        "error": str(e),
-                                    },
-                                )
+                                await self._handle_enqueue_failure(new_event, e)
 
                         if emitted_types:
                             self._log.info(

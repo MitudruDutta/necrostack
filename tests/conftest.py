@@ -11,7 +11,7 @@ settings.register_profile("dev", max_examples=20)
 settings.load_profile("dev")
 
 
-@pytest.fixture
-def anyio_backend():
+@pytest.fixture(scope="session")
+def anyio_backend() -> str:
     """Use asyncio as the async backend for pytest-asyncio."""
     return "asyncio"
