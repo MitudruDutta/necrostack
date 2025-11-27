@@ -2,7 +2,7 @@
 
 from necrostack.core.event import Event
 from necrostack.core.organ import Organ
-# from necrostack.core.spine import Spine  # Will be implemented in task 5
+from necrostack.core.spine import Spine
 
-__all__ = ["Event", "Organ"]  # "Spine" will be added in task 5
+__all__ = ["Event", "Organ", "Spine"]
 __version__ = "0.1.0"

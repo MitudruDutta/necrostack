@@ -55,59 +55,59 @@
     - **Property 9: Backend FIFO Ordering**
     - **Validates: Requirements 4.2**
 
-- [ ] 5. Implement Spine dispatcher
-  - [ ] 5.1 Create Spine class with organ registration
+- [x] 5. Implement Spine dispatcher
+  - [x] 5.1 Create Spine class with organ registration
     - Implement `Spine.__init__()` accepting organs, backend, max_steps
     - Build internal routing table from organ `listens_to`
     - Validate organ handler signatures at registration
     - _Requirements: 3.1, 7.2_
 
-  - [ ] 5.2 Write property test for invalid Organ signature detection
+  - [x] 5.2 Write property test for invalid Organ signature detection
     - **Property 10: Invalid Organ Signature Detection**
     - **Validates: Requirements 7.2**
 
-  - [ ] 5.3 Implement event emission and handler invocation
+  - [x] 5.3 Implement event emission and handler invocation
     - Implement `emit()` to enqueue events
     - Implement `_invoke_handler()` supporting sync and async handlers
     - Handle handler return values (Event, list, None)
     - _Requirements: 2.3, 2.4, 2.5, 2.6, 2.7_
 
-  - [ ] 5.4 Write property test for Event routing correctness
+  - [x] 5.4 Write property test for Event routing correctness
     - **Property 4: Event Routing Correctness**
     - **Validates: Requirements 2.2, 2.3, 3.3**
 
-  - [ ] 5.5 Write property test for handler return value processing
+  - [x] 5.5 Write property test for handler return value processing
     - **Property 5: Handler Return Value Processing**
     - **Validates: Requirements 2.6, 2.7**
 
-  - [ ] 5.6 Implement main processing loop
+  - [x] 5.6 Implement main processing loop
     - Implement `run()` with event pull/dispatch loop
     - Add max_steps guard for loop termination
     - Implement graceful `stop()` method
     - _Requirements: 3.2, 3.6, 3.7_
 
-  - [ ] 5.7 Write property test for Organ invocation order
+  - [x] 5.7 Write property test for Organ invocation order
     - **Property 6: Organ Invocation Order**
     - **Validates: Requirements 3.4**
 
-  - [ ] 5.8 Implement error handling in processing loop
+  - [x] 5.8 Implement error handling in processing loop
     - Catch and log handler exceptions
     - Continue processing after handler failures
     - _Requirements: 3.5_
 
-  - [ ] 5.9 Write property test for error resilience
+  - [x] 5.9 Write property test for error resilience
     - **Property 7: Error Resilience**
     - **Validates: Requirements 3.5**
 
-  - [ ] 5.10 Write property test for max-steps termination
+  - [x] 5.10 Write property test for max-steps termination
     - **Property 8: Max-Steps Termination**
     - **Validates: Requirements 3.7**
 
-- [ ] 6. Checkpoint - Ensure all tests pass
+- [x] 6. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 7. Implement Redis Streams backend (MVP-Light)
-  - [ ] 7.1 Create RedisBackend class
+- [x] 7. Implement Redis Streams backend (MVP-Light)
+  - [x] 7.1 Create RedisBackend class
     - Implement connection to Redis using redis-py async client
     - Implement `enqueue()` using XADD
     - Implement `pull()` using XREAD with blocking timeout
@@ -115,11 +115,11 @@
     - Implement `close()` to close connection
     - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-  - [ ] 7.2 Write integration tests for Redis backend
+  - [x] 7.2 Write integration tests for Redis backend
     - Test enqueue/pull round-trip with real Redis
     - Test timeout behavior on empty stream
     - Test connection handling
     - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 8. Final Checkpoint - Ensure all tests pass
+- [x] 8. Final Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.

@@ -4,7 +4,7 @@ Minimal async-first event-driven micro-framework for Python 3.11+.
 
 ## Features
 
-- **Event** — Typed, immutable, validated message objects using Pydantic v2
+- **Event** — Typed, immutable, validated message objects using Pydantic 
 - **Organ** — Pluggable modules that listen to specific event types
 - **Spine** — Queue-based dispatcher that routes events to Organs
 
