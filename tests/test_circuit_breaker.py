@@ -7,7 +7,12 @@ import pytest
 from necrostack.backends.inmemory import InMemoryBackend
 from necrostack.core.event import Event
 from necrostack.core.organ import Organ
-from necrostack.core.spine import BackendUnavailableError, Spine
+from necrostack.core.spine import (
+    BackendUnavailableError,
+    HandlerFailureMode,
+    InMemoryFailedEventStore,
+    Spine,
+)
 
 
 class AlwaysFailingBackend:
@@ -160,8 +165,8 @@ class TestSpineAcknowledgment:
         assert backend.acked_events[0].id == event.id
 
     @pytest.mark.timeout(5)
-    async def test_no_ack_when_handler_fails(self):
-        """Spine SHALL NOT call ack() when a handler raises exception."""
+    async def test_no_ack_when_handler_fails_with_nack_mode(self):
+        """Spine SHALL NOT call ack() when handler fails and mode is NACK."""
         backend = AckTrackingBackend()
 
         class FailOrgan(Organ):
@@ -170,11 +175,47 @@ class TestSpineAcknowledgment:
             def handle(self, event: Event) -> None:
                 raise ValueError("Handler failed")
 
-        spine = Spine(organs=[FailOrgan()], backend=backend)
+        spine = Spine(
+            organs=[FailOrgan()],
+            backend=backend,
+            handler_failure_mode=HandlerFailureMode.NACK,
+        )
         backend._stop_callback = spine.stop
         event = Event(event_type="TEST", payload={})
 
         await spine.run(event)
 
-        # Event should NOT be acked since handler failed
+        # Event should NOT be acked since handler failed and mode is NACK
         assert len(backend.acked_events) == 0
+
+    @pytest.mark.timeout(5)
+    async def test_handler_failure_stored_in_dlq_with_store_mode(self):
+        """Handler failures SHALL go to DLQ when mode is STORE."""
+        backend = AckTrackingBackend()
+        dlq = InMemoryFailedEventStore()
+
+        class FailOrgan(Organ):
+            listens_to = ["TEST"]
+
+            def handle(self, event: Event) -> None:
+                raise ValueError("Handler failed")
+
+        spine = Spine(
+            organs=[FailOrgan()],
+            backend=backend,
+            handler_failure_mode=HandlerFailureMode.STORE,
+            failed_event_store=dlq,
+        )
+        backend._stop_callback = spine.stop
+        event = Event(event_type="TEST", payload={})
+
+        await spine.run(event)
+
+        # Event should be in DLQ
+        assert len(dlq) == 1
+        failed_event, error = dlq.get_failed_events()[0]
+        assert failed_event.id == event.id
+        assert "Handler failed" in str(error)
+
+        # Event should be acked after storing in DLQ (STORE mode acks after DLQ storage)
+        assert len(backend.acked_events) == 1

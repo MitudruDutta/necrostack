@@ -15,7 +15,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlparse, urlunparse
 from uuid import uuid4
@@ -277,7 +277,7 @@ class RedisBackend:
                         "original_id": message_id,
                         "event": data.get("event", "{}"),
                         "reason": reason,
-                        "failed_at": datetime.now(timezone.utc).isoformat(),
+                        "failed_at": datetime.now(UTC).isoformat(),
                     },
                 )
                 logger.warning(f"Moved {message_id} to DLQ: {reason}")

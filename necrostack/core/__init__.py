@@ -9,7 +9,8 @@ Types:
     SpineStats: Statistics dataclass from a Spine run.
 
 Failure Handling:
-    EnqueueFailureMode: Enum for failure strategies (FAIL, RETRY, STORE).
+    EnqueueFailureMode: Enum for enqueue failure strategies (FAIL, RETRY, STORE).
+    HandlerFailureMode: Enum for handler failure strategies (LOG, STORE, NACK).
     EnqueueError: Raised when enqueue fails in FAIL/RETRY mode.
     BackendUnavailableError: Raised when backend fails beyond threshold.
     FailedEventStore: Protocol for storing failed events.
@@ -26,6 +27,7 @@ from necrostack.core.spine import (
     EnqueueError,
     EnqueueFailureMode,
     FailedEventStore,
+    HandlerFailureMode,
     InMemoryFailedEventStore,
     Spine,
     SpineStats,
@@ -38,6 +40,7 @@ __all__ = [
     "Spine",
     "SpineStats",
     "EnqueueFailureMode",
+    "HandlerFailureMode",
     "EnqueueError",
     "BackendUnavailableError",
     "FailedEventStore",

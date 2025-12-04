@@ -125,14 +125,21 @@ await spine.run(start_event)
 | `organs` | `list[Organ]` | required | Registered event handlers |
 | `backend` | `Backend` | required | Storage backend implementation |
 | `max_steps` | `int` | 10,000 | Maximum events before RuntimeError |
-| `enqueue_failure_mode` | `EnqueueFailureMode` | STORE | Failure handling strategy |
+| `enqueue_failure_mode` | `EnqueueFailureMode` | STORE | Enqueue failure handling strategy |
+| `handler_failure_mode` | `HandlerFailureMode` | LOG | Handler failure handling strategy |
 | `retry_attempts` | `int` | 3 | Retry count for RETRY mode |
 | `retry_base_delay` | `float` | 0.1 | Base delay (seconds) for exponential backoff |
+| `handler_timeout` | `float` | 30.0 | Timeout in seconds for async handlers |
 
-**Failure Modes:**
+**Enqueue Failure Modes:**
 - `FAIL`: Re-raise exception immediately, halt processing
 - `RETRY`: Exponential backoff retry before failing
 - `STORE`: Persist to dead-letter store, continue processing
+
+**Handler Failure Modes:**
+- `LOG`: Log the error and continue (event is acked, no retry)
+- `STORE`: Store failed event in DLQ, then ack
+- `NACK`: Don't ack the event (relies on backend retry mechanism)
 
 ## Backend Architecture
 

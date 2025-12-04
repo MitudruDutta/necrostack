@@ -7,6 +7,7 @@ from necrostack.core import (
     EnqueueFailureMode,
     Event,
     FailedEventStore,
+    HandlerFailureMode,
     InMemoryFailedEventStore,
     Organ,
     Spine,
@@ -23,6 +24,7 @@ __all__ = [
     "SpineStats",
     # Failure handling
     "EnqueueFailureMode",
+    "HandlerFailureMode",
     "EnqueueError",
     "BackendUnavailableError",
     "FailedEventStore",

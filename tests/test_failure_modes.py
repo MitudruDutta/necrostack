@@ -32,7 +32,7 @@ class FailOnNthEnqueue:
     async def pull(self, timeout: float = 1.0) -> Event | None:
         try:
             return await asyncio.wait_for(self._queue.get(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return None
 
     async def ack(self, event: Event) -> None:
@@ -284,7 +284,7 @@ class TestRetryMode:
             async def pull(self, timeout: float = 1.0) -> Event | None:
                 try:
                     return await asyncio.wait_for(self._queue.get(), timeout=timeout)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     return None
 
             async def ack(self, event: Event) -> None:
@@ -337,7 +337,7 @@ class TestRetryMode:
             async def pull(self, timeout: float = 1.0) -> Event | None:
                 try:
                     return await asyncio.wait_for(self._queue.get(), timeout=timeout)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     return None
 
             async def ack(self, event: Event) -> None:

@@ -12,7 +12,6 @@ go through the backend.
 import asyncio
 import inspect
 from collections import defaultdict
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Protocol
@@ -34,6 +33,19 @@ class EnqueueFailureMode(Enum):
     FAIL = "fail"
     RETRY = "retry"
     STORE = "store"
+
+
+class HandlerFailureMode(Enum):
+    """Strategy for handling handler failures.
+
+    LOG: Log the error and continue (event is acked, no retry)
+    STORE: Store failed event in DLQ (event is acked)
+    NACK: Don't ack the event (relies on backend retry mechanism)
+    """
+
+    LOG = "log"
+    STORE = "store"
+    NACK = "nack"
 
 
 class EnqueueError(Exception):
@@ -73,12 +85,22 @@ class FailedEventStore(Protocol):
 
 
 class InMemoryFailedEventStore:
-    """Simple in-memory failed event store."""
+    """Simple in-memory failed event store with bounded size."""
 
-    def __init__(self) -> None:
+    def __init__(self, max_size: int = 10_000) -> None:
         self._events: list[tuple[Event, Exception]] = []
+        self._max_size = max_size
+        self._dropped_count = 0
+
+    def __bool__(self) -> bool:
+        """Always truthy so 'store or default' works correctly."""
+        return True
 
     async def store(self, event: Event, error: Exception) -> None:
+        if len(self._events) >= self._max_size:
+            # Drop oldest to make room (FIFO eviction)
+            self._events.pop(0)
+            self._dropped_count += 1
         self._events.append((event, error))
 
     def get_failed_events(self) -> list[tuple[Event, Exception]]:
@@ -89,6 +111,11 @@ class InMemoryFailedEventStore:
 
     def __len__(self) -> int:
         return len(self._events)
+
+    @property
+    def dropped_count(self) -> int:
+        """Number of events dropped due to size limit."""
+        return self._dropped_count
 
 
 @dataclass
@@ -112,19 +139,23 @@ class Spine:
         backend: "Backend",
         max_steps: int = 10_000,
         enqueue_failure_mode: EnqueueFailureMode = EnqueueFailureMode.STORE,
+        handler_failure_mode: HandlerFailureMode = HandlerFailureMode.LOG,
         failed_event_store: FailedEventStore | None = None,
         retry_attempts: int = 3,
         retry_base_delay: float = 0.1,
         max_consecutive_backend_failures: int = DEFAULT_MAX_CONSECUTIVE_FAILURES,
+        handler_timeout: float = 30.0,
     ) -> None:
         self.organs = organs
         self.backend = backend
         self.max_steps = max_steps
         self.enqueue_failure_mode = enqueue_failure_mode
+        self.handler_failure_mode = handler_failure_mode
         self.failed_event_store = failed_event_store or InMemoryFailedEventStore()
         self.retry_attempts = retry_attempts
         self.retry_base_delay = retry_base_delay
         self.max_consecutive_backend_failures = max_consecutive_backend_failures
+        self.handler_timeout = handler_timeout
         self._log = configure_spine_logger()
         self._running = False
         self._stats = SpineStats()
@@ -148,10 +179,31 @@ class Spine:
                     )
 
     async def _invoke_handler(self, organ: Organ, event: Event) -> Event | list[Event] | None:
+        """Invoke handler with timeout and return type validation."""
         result = organ.handle(event)
         if inspect.iscoroutine(result):
-            return await result
-        return result
+            try:
+                result = await asyncio.wait_for(result, timeout=self.handler_timeout)
+            except TimeoutError:
+                raise TimeoutError(f"Handler {organ.name} timed out after {self.handler_timeout}s")
+
+        # Validate return type
+        if result is None:
+            return None
+        if isinstance(result, Event):
+            return result
+        if isinstance(result, list):
+            for i, item in enumerate(result):
+                if not isinstance(item, Event):
+                    raise TypeError(
+                        f"Handler {organ.name} returned list with non-Event at index {i}: "
+                        f"got {type(item).__name__}"
+                    )
+            return result
+        raise TypeError(
+            f"Handler {organ.name} must return Event, list[Event], or None, "
+            f"got {type(result).__name__}"
+        )
 
     def stop(self) -> None:
         self._running = False
@@ -288,6 +340,7 @@ class Spine:
 
             self._stats.events_processed += 1
             handler_failed = False
+            handler_error: Exception | None = None
 
             for organ in self.organs:
                 if event.event_type not in organ.listens_to:
@@ -333,6 +386,7 @@ class Spine:
 
                 except Exception as e:
                     handler_failed = True
+                    handler_error = e
                     self._stats.handler_errors[organ.name] += 1
                     self._log.error(
                         f"Handler {organ.name} raised exception: {e}",
@@ -344,13 +398,56 @@ class Spine:
                         },
                     )
 
-            # Only ack if all handlers succeeded - failed events stay pending for retry
-            # Note on ack failure behavior: If ack fails, the event remains pending in
-            # the backend and will be re-pulled. This relies on backend visibility
-            # timeouts and assumes handlers are idempotent. Unlike pull failures,
-            # ack failures do not trigger circuit breaker since the event was already
-            # processed successfully - only the acknowledgment failed.
-            if not handler_failed:
+            # Handle based on handler_failure_mode
+            if handler_failed:
+                if self.handler_failure_mode == HandlerFailureMode.STORE:
+                    # Store in DLQ and ack
+                    await self.failed_event_store.store(event, handler_error)
+                    self._log.warning(
+                        f"Stored failed event in DLQ: {event.event_type}",
+                        extra={
+                            "event_id": event.id,
+                            "event_type": event.event_type,
+                            "error": str(handler_error),
+                        },
+                    )
+                    try:
+                        await self.backend.ack(event)
+                    except Exception as e:
+                        self._stats.ack_errors += 1
+                        self._log.error(
+                            f"Failed to ack event after DLQ store: {e}",
+                            extra={
+                                "event_id": event.id,
+                                "event_type": event.event_type,
+                                "error": str(e),
+                            },
+                        )
+                elif self.handler_failure_mode == HandlerFailureMode.NACK:
+                    # Don't ack - event stays pending for backend retry
+                    self._log.warning(
+                        f"Event not acked due to handler failure (will retry): {event.event_type}",
+                        extra={
+                            "event_id": event.id,
+                            "event_type": event.event_type,
+                        },
+                    )
+                # LOG mode: just log (already done above), ack the event
+                else:
+                    try:
+                        await self.backend.ack(event)
+                    except Exception as e:
+                        self._stats.ack_errors += 1
+                        self._log.error(
+                            f"Failed to ack event after handler error (LOG mode): {e}",
+                            extra={
+                                "event_id": event.id,
+                                "event_type": event.event_type,
+                                "error": str(e),
+                            },
+                        )
+            else:
+                # All handlers succeeded - ack the event
                 try:
                     await self.backend.ack(event)
                 except Exception as e:
@@ -363,6 +460,5 @@ class Spine:
                             "error": str(e),
                         },
                     )
-                    # Event remains pending for retry on next pull
 
         return self._stats
