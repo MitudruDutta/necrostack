@@ -467,29 +467,6 @@ pytest tests/test_spine.py
 pytest --hypothesis-profile=ci
 ```
 
-## Roadmap
-
-### Phase 2 (Completed ✓)
-- [x] Consumer group support for RedisBackend (`XREADGROUP`/`XACK`)
-- [x] Dead-letter queue integration
-- [x] Pending message recovery (`XPENDING`/`XCLAIM`)
-
-### Phase 3 (Planned — v1.1, Q2 2025)
-Focuses on production observability and extensibility.
-
-- [ ] Metrics export (Prometheus/OpenTelemetry) — enables production monitoring dashboards
-- [ ] Distributed tracing integration — required for microservice debugging
-- [ ] Configurable retry/backoff per event type — allows fine-grained failure handling
-- [ ] Event schema registry — enables schema evolution and validation
-- [ ] Middleware support — prerequisite for decorator syntax; enables cross-cutting concerns
-- [ ] Decorator syntax for Organs — depends on middleware support; improves DX
-
-### Phase 4 (Future — v2.0)
-Advanced features for complex deployments.
-
-- [ ] Event replay and time-travel debugging — requires schema registry for version compatibility
-- [ ] Multi-backend routing — enables hybrid cloud and failover scenarios
-
 ## Contributing
 
 Contributions are welcome. Please ensure:
