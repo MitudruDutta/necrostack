@@ -42,7 +42,9 @@ class InMemoryBackend:
             try:
                 self._queue.put_nowait(event)
             except asyncio.QueueFull:
-                raise BackendFullError(f"Queue full (max_size={self._max_size}), cannot enqueue event")
+                raise BackendFullError(
+                    f"Queue full (max_size={self._max_size}), cannot enqueue event"
+                )
         else:
             await self._queue.put(event)
 
