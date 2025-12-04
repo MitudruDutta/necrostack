@@ -19,36 +19,31 @@ from necrostack.apps.seance.organs import (
 )
 from necrostack.backends.inmemory import InMemoryBackend
 from necrostack.core.event import Event
-from necrostack.core.spine import Spine
+from necrostack.core.spine import Spine, SpineStats
 
 
 async def run_seance(
     spirit_name: str = "Ancient One",
     ritual: str = "Midnight Invocation",
     question: str = "What wisdom do you bring?",
-) -> None:
-    """Run a complete séance session.
-
-    Args:
-        spirit_name: Name of the spirit to summon.
-        ritual: Name of the ritual being performed.
-        question: Question to ask the spirit.
-    """
-    # Create the backend
+) -> SpineStats:
+    """Run a complete séance session."""
     backend = InMemoryBackend()
+    spine: Spine | None = None
 
-    # Create organs in the order they should be invoked
+    def stop_spine() -> None:
+        if spine is not None:
+            spine.stop()
+
     organs = [
         SummonSpirit(),
         AskQuestion(),
         InterpretResponse(),
-        ManifestEffect(),
+        ManifestEffect(on_complete=stop_spine),
     ]
 
-    # Create the Spine dispatcher
     spine = Spine(organs=organs, backend=backend)
 
-    # Create the initial event
     start_event = Event(
         event_type="SUMMON_RITUAL",
         payload={
@@ -58,20 +53,14 @@ async def run_seance(
         },
     )
 
-    # Run the séance
-    try:
-        result = await spine.run(start_event)
-        if result is not None:
-            print(f"Séance completed with result: {result}")
-    except Exception as e:
-        print(f"Error during séance: {e}")
-        raise
+    return await spine.run(start_event)
 
 
 def main() -> None:
     """Main entry point for the Séance demo."""
-    print("🕯️  Beginning the Séance... 🕯️")
-    asyncio.run(run_seance())
+    print("🕯️  Beginning the Séance... 🕯️\n")
+    stats = asyncio.run(run_seance())
+    print(f"\n✨ Séance complete: {stats.events_processed} events processed")
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ description = "Async-first event-driven micro-framework for Python"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
-keywords = ["event-driven", "async", "framework", "microservices"]
+keywords = ["event-driven", "async", "framework", "microservices", "eda"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -17,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Framework :: AsyncIO",
     "Typing :: Typed",
 ]
@@ -29,6 +30,8 @@ redis = ["redis>=5.0"]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
+    "pytest-cov>=4.0",
+    "pytest-timeout>=2.0",
     "hypothesis>=6.100",
     "ruff>=0.4",
     "black>=24.0",
@@ -40,6 +43,19 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
+addopts = "--timeout=30"
+
+[tool.coverage.run]
+source = ["necrostack"]
+branch = true
+omit = ["necrostack/apps/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
 
 [tool.ruff]
 target-version = "py311"
@@ -52,3 +68,7 @@ ignore = []
 [tool.black]
 target-version = ["py311"]
 line-length = 100
+
+[tool.hypothesis]
+profiles.dev.max_examples = 20
+profiles.ci.max_examples = 100

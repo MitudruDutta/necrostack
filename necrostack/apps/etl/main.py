@@ -20,9 +20,8 @@ from necrostack.apps.etl.organs import (
 )
 from necrostack.backends.inmemory import InMemoryBackend
 from necrostack.core.event import Event
-from necrostack.core.spine import Spine
+from necrostack.core.spine import Spine, SpineStats
 
-# Embedded sample CSV data for the demo
 SAMPLE_CSV_DATA = """name,age,salary,department
 Alice,30,75000,Engineering
 Bob,25,55000,Marketing
@@ -41,22 +40,34 @@ async def run_etl(
     csv_data: str = SAMPLE_CSV_DATA,
     source_name: str = "employees.csv",
     output_callback: Callable[[str], None] | None = None,
-) -> ExportSummary:
+) -> tuple[SpineStats, ExportSummary]:
     """Run a complete ETL pipeline.
 
     Args:
-        csv_data: CSV data to process.
-        source_name: Name of the data source.
-        output_callback: Optional callback for capturing output (useful for testing).
+        csv_data: CSV string data to process.
+        source_name: Name identifier for the data source.
+        output_callback: Optional callback for capturing summary output.
 
     Returns:
-        The ExportSummary organ instance (for testing access to last_summary).
-    """
-    # Create the backend
-    backend = InMemoryBackend()
+        A tuple of (SpineStats, ExportSummary):
+        - SpineStats: Processing metrics including events_processed (int),
+          events_emitted (int), handler_errors (dict), and backend_errors (int).
+        - ExportSummary: The organ instance with last_summary (str) containing
+          the formatted output text with row counts and numeric statistics.
 
-    # Create organs in the order they should be invoked
-    export_summary = ExportSummary(output_callback=output_callback)
+    Example:
+        stats, summary = await run_etl()
+        print(f"Processed {stats.events_processed} events")
+        print(summary.last_summary)  # "=== ETL Summary for 'employees.csv' ===..."
+    """
+    backend = InMemoryBackend()
+    spine: Spine | None = None
+
+    def stop_spine() -> None:
+        if spine is not None:
+            spine.stop()
+
+    export_summary = ExportSummary(output_callback=output_callback, on_complete=stop_spine)
     organs = [
         ExtractCSV(),
         CleanData(),
@@ -64,10 +75,8 @@ async def run_etl(
         export_summary,
     ]
 
-    # Create the Spine dispatcher
     spine = Spine(organs=organs, backend=backend)
 
-    # Create the initial event
     start_event = Event(
         event_type="ETL_START",
         payload={
@@ -76,16 +85,15 @@ async def run_etl(
         },
     )
 
-    # Run the ETL pipeline
-    await spine.run(start_event)
-
-    return export_summary
+    stats = await spine.run(start_event)
+    return stats, export_summary
 
 
 def main() -> None:
     """Main entry point for the ETL demo."""
     print("📊 Starting ETL Pipeline... 📊\n")
-    asyncio.run(run_etl())
+    stats, _ = asyncio.run(run_etl())
+    print(f"\n✅ ETL complete: {stats.events_processed} events processed")
 
 
 if __name__ == "__main__":

@@ -179,11 +179,83 @@ backend = RedisBackend(
 - JSON serialization via Pydantic's `model_dump()`
 - Blocking reads with configurable timeout
 
-**Current Limitations (MVP):**
-- No consumer group support (`XREADGROUP`/`XACK` planned)
-- `ack()` is a no-op (no message acknowledgment)
-- At-least-once delivery semantics
-- No dead-letter queue integration
+**Features:**
+- Consumer groups with `XREADGROUP`/`XACK` for at-least-once delivery
+- Automatic pending message recovery via `XPENDING`/`XCLAIM`
+- Dead-letter queue for poison messages (configurable max retries)
+- Connection pooling and automatic reconnection
+- Health checks and metrics tracking
+
+**Configuration Options:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `redis_url` | `str` | required | Redis connection URL |
+| `stream_key` | `str` | `"necrostack:events"` | Redis stream key |
+| `consumer_group` | `str` | `"necrostack"` | Consumer group name |
+| `consumer_name` | `str` | auto-generated | Unique consumer identifier |
+| `pool_size` | `int` | 10 | Connection pool size |
+| `max_retries` | `int` | 3 | Max delivery attempts before DLQ |
+| `claim_min_idle_ms` | `int` | 30000 | Min idle time (ms) before claiming pending messages |
+| `dlq_stream` | `str` | `"{stream_key}:dlq"` | Dead-letter queue stream key |
+
+**Health Checks & Metrics:**
+```python
+# Health check returns BackendHealth dataclass
+health = await backend.health()
+print(health.healthy)      # True/False
+print(health.latency_ms)   # Response time in milliseconds
+print(health.details)      # {"stream_length": 42, "consumer_group": "...", ...}
+
+# Metrics via RedisMetrics dataclass
+metrics = backend.metrics
+print(metrics.events_enqueued)    # Total events added
+print(metrics.events_pulled)      # Total events retrieved
+print(metrics.events_acked)       # Total events acknowledged
+print(metrics.events_failed)      # Total events moved to DLQ
+print(metrics.reconnections)      # Connection recovery count
+print(metrics.pending_recovered)  # Messages recovered via XCLAIM
+```
+
+**Consumer Groups & Message Acknowledgment:**
+```python
+from necrostack.backends.redis_backend import RedisBackend
+
+# Consumer groups are created automatically on first operation
+backend = RedisBackend(
+    redis_url="redis://localhost:6379",
+    stream_key="myapp:events",
+    consumer_group="workers",
+    consumer_name="worker-1",  # Unique per instance
+)
+
+# Pull and acknowledge messages
+event = await backend.pull(timeout=5.0)
+if event:
+    # Process event...
+    await backend.ack(event)  # XACK - removes from pending
+
+# Negative acknowledge (move to DLQ immediately)
+await backend.nack(event, reason="Processing failed")
+```
+
+**Pending Message Recovery:**
+```python
+# Pending messages are automatically recovered during pull()
+# when they exceed claim_min_idle_ms (default: 30 seconds)
+backend = RedisBackend(
+    redis_url="redis://localhost:6379",
+    claim_min_idle_ms=5000,  # Claim after 5 seconds idle
+    max_retries=3,           # Move to DLQ after 3 failed attempts
+)
+
+# Recovery happens transparently - pull() checks pending first
+event = await backend.pull()  # May return a recovered message
+if backend.metrics.pending_recovered > 0:
+    print("Recovered pending messages from failed consumers")
+```
+
+**Connection Pooling & Reconnection:**
+Connection pooling (`pool_size`) and automatic reconnection are enabled by default and require no configuration. The backend automatically reconnects on connection loss and tracks reconnection count in `metrics.reconnections`.
 
 ## Observability
 
@@ -390,17 +462,26 @@ pytest --hypothesis-profile=ci
 
 ## Roadmap
 
-### Phase 2 (Planned)
-- [ ] Consumer group support for RedisBackend (`XREADGROUP`/`XACK`)
-- [ ] Dead-letter queue integration
-- [ ] Configurable retry/backoff per event type
-- [ ] Event schema registry
+### Phase 2 (Completed ✓)
+- [x] Consumer group support for RedisBackend (`XREADGROUP`/`XACK`)
+- [x] Dead-letter queue integration
+- [x] Pending message recovery (`XPENDING`/`XCLAIM`)
 
-### Phase 3 (Future)
-- [ ] Metrics export (Prometheus/OpenTelemetry)
-- [ ] Distributed tracing integration
-- [ ] Event replay and time-travel debugging
-- [ ] Multi-backend routing
+### Phase 3 (Planned — v1.1, Q2 2025)
+Focuses on production observability and extensibility.
+
+- [ ] Metrics export (Prometheus/OpenTelemetry) — enables production monitoring dashboards
+- [ ] Distributed tracing integration — required for microservice debugging
+- [ ] Configurable retry/backoff per event type — allows fine-grained failure handling
+- [ ] Event schema registry — enables schema evolution and validation
+- [ ] Middleware support — prerequisite for decorator syntax; enables cross-cutting concerns
+- [ ] Decorator syntax for Organs — depends on middleware support; improves DX
+
+### Phase 4 (Future — v2.0)
+Advanced features for complex deployments.
+
+- [ ] Event replay and time-travel debugging — requires schema registry for version compatibility
+- [ ] Multi-backend routing — enables hybrid cloud and failover scenarios
 
 ## Contributing
 

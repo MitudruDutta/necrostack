@@ -117,7 +117,11 @@ def test_export_summary_organ():
 
     result = organ.handle(event)
 
-    assert result is None  # Terminal organ
+    # ExportSummary emits ETL_COMPLETE to signal completion
+    assert result is not None
+    assert result.event_type == "ETL_COMPLETE"
+    assert result.payload["source_name"] == "test.csv"
+    assert result.payload["row_count"] == 1
     assert len(outputs) == 1
     assert "ETL Summary" in outputs[0]
     assert "test.csv" in outputs[0]
@@ -154,7 +158,9 @@ def test_etl_complete_chain():
     assert transformed_event.event_type == "DATA_TRANSFORMED"
 
     result = export.handle(transformed_event)
-    assert result is None
+    # ExportSummary emits ETL_COMPLETE to signal completion
+    assert result is not None
+    assert result.event_type == "ETL_COMPLETE"
 
     # Verify final output
     assert len(outputs) == 1
