@@ -1,0 +1,9 @@
+{
+  "notifications": [
+    {"user_id": "user_001", "channels": ["email", "sms", "push"], "message": "Your order #12345 has shipped!", "priority": "high"},
+    {"user_id": "user_002", "channels": ["email"], "message": "Weekly digest: 5 new updates", "priority": "low"},
+    {"user_id": "user_003", "channels": ["sms", "push"], "message": "Security alert: New login detected", "priority": "critical"},
+    {"user_id": "user_001", "channels": ["push"], "message": "Payment received - $99.99", "priority": "normal"},
+    {"user_id": "user_002", "channels": ["email", "push"], "message": "Your subscription renews tomorrow", "priority": "high"}
+  ]
+}

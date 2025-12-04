@@ -1,0 +1,6 @@
+user_id,channels,message,priority
+user_001,email|sms|push,Your order #12345 has shipped!,high
+user_002,email,Weekly digest: 5 new updates,low
+user_003,sms|push,Security alert: New login detected,critical
+user_001,push,Payment received - $99.99,normal
+user_002,email|push,Your subscription renews tomorrow,high

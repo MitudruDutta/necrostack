@@ -76,7 +76,50 @@ NOTIFICATION_VALIDATED
 
 ```bash
 cd examples/notification_pipeline
+
+# Demo with sample notifications
 python main.py
+
+# Load from JSON file
+python main.py --file sample_notifications.json
+
+# Load from CSV file  
+python main.py --file sample_notifications.csv
+
+# Interactive mode
+python main.py --interactive
+
+# Stress test
+python main.py --stress --count 200
+```
+
+## Interactive Mode
+
+```
+> user_001 email,sms 'Your order shipped!' high
+  ✓ Queued: user_001 → ['email', 'sms']
+> user_002 push 'New message' normal
+  ✓ Queued: user_002 → ['push']
+> send
+  (processes all queued notifications)
+> quit
+```
+
+## File Formats
+
+**JSON** (`sample_notifications.json`):
+```json
+{
+  "notifications": [
+    {"user_id": "user_001", "channels": ["email", "sms"], "message": "Hello!", "priority": "high"}
+  ]
+}
+```
+
+**CSV** (`sample_notifications.csv`):
+```csv
+user_id,channels,message,priority
+user_001,email|sms,Hello!,high
 ```
 
 ## Expected Output
