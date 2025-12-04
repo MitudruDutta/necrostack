@@ -74,7 +74,15 @@ class AutoStopBackend(InMemoryBackend):
 
 
 def create_test_notifications() -> list[Event]:
-    """Create test notification requests."""
+    """Create test notification requests with dynamic values."""
+    import random
+    from datetime import datetime
+
+    # Generate dynamic values
+    order_id = random.randint(10000, 99999)
+    update_count = random.randint(1, 20)
+    timestamp = datetime.now().strftime("%H:%M:%S")
+
     return [
         # Valid notification - all channels
         Event(
@@ -82,7 +90,7 @@ def create_test_notifications() -> list[Event]:
             payload={
                 "user_id": "user_001",
                 "channels": ["email", "sms", "push"],
-                "message": "Your order #12345 has shipped!",
+                "message": f"Your order #{order_id} has shipped! [{timestamp}]",
                 "priority": "high",
             },
         ),
@@ -92,7 +100,7 @@ def create_test_notifications() -> list[Event]:
             payload={
                 "user_id": "user_002",
                 "channels": ["email"],
-                "message": "Weekly digest: 5 new updates",
+                "message": f"Weekly digest: {update_count} new updates",
                 "priority": "low",
             },
         ),
@@ -102,7 +110,7 @@ def create_test_notifications() -> list[Event]:
             payload={
                 "user_id": "user_003",
                 "channels": ["sms", "push"],
-                "message": "Security alert: New login detected",
+                "message": f"Security alert: New login detected at {timestamp}",
                 "priority": "critical",
             },
         ),
