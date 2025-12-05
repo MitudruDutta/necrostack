@@ -293,7 +293,7 @@ If your system follows this pattern, NecroStack is a great fit."
 "Want to try it? Here's how to get started:
 
 1. `pip install necrostack`
-2. Clone the repo: `git clone github.com/MitudruDutta/necrostack`
+2. Clone the repo: `git clone https://github.com/MitudruDutta/necrostack`
 3. Run the demos: `cd examples/notification_pipeline && python main.py`
 4. Read the quick start guide and build your first pipeline
 

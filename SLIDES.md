@@ -459,8 +459,8 @@ event = Event(event_type="")  # ✗ Fails validation
 │     pip install necrostack                 │
 │                                            │
 │  2. Clone Examples                         │
-│     git clone github.com/MitudruDutta/     │
-│               necrostack                   │
+│     git clone https://github.com/          │
+│       MitudruDutta/necrostack              │
 │                                            │
 │  3. Run Demo                               │
 │     cd examples/notification_pipeline      │
