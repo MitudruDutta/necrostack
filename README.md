@@ -2,6 +2,29 @@
 
 A minimal, async-first event-driven micro-framework for Python, designed for building reactive, composable systems with formal guarantees on event flow and processing semantics.
 
+> 📢 **Presenting NecroStack?** See **[MATERIALS_INDEX.md](MATERIALS_INDEX.md)** for a complete guide to all presentation resources!
+
+## 📚 Documentation & Resources
+
+**New to NecroStack?** Start here:
+- **[GETTING_STARTED.md](GETTING_STARTED.md)** - Your first event pipeline in 10 minutes
+- **[FAQ.md](FAQ.md)** - Frequently asked questions
+
+**For Presentations & Pitches:**
+- **[PITCH.md](PITCH.md)** - Comprehensive pitch deck for presentations
+- **[QUICKSTART.md](QUICKSTART.md)** - 5-minute demo scripts for live demos
+- **[SLIDES.md](SLIDES.md)** - Complete slide deck outline (20+ slides)
+- **[SPEAKER_NOTES.md](SPEAKER_NOTES.md)** - Detailed speaker notes and Q&A prep
+- **[DIAGRAMS.md](DIAGRAMS.md)** - Visual architecture diagrams (ASCII art)
+- **[USE_CASES.md](USE_CASES.md)** - Real-world use cases and patterns
+
+These materials are ideal for:
+- Conference talks and meetups
+- Internal team presentations
+- Educational workshops
+- Architecture discussions
+- Self-paced learning
+
 ## Abstract
 
 NecroStack implements a lightweight event-driven architecture (EDA) pattern that decouples event producers from consumers through a central dispatcher mechanism. The framework provides three core abstractions—**Event**, **Organ**, and **Spine**—that together form a complete reactive processing pipeline with pluggable storage backends, structured observability, and configurable fault tolerance strategies.
