@@ -2,6 +2,8 @@
 
 A minimal, async-first event-driven micro-framework for Python, designed for building reactive, composable systems with formal guarantees on event flow and processing semantics.
 
+> 📢 **Presenting NecroStack?** See **[MATERIALS_INDEX.md](MATERIALS_INDEX.md)** for a complete guide to all presentation resources!
+
 ## 📚 Documentation & Resources
 
 **New to NecroStack?** Start here:
