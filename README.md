@@ -2,15 +2,18 @@
 
 A minimal, async-first event-driven micro-framework for Python, designed for building reactive, composable systems with formal guarantees on event flow and processing semantics.
 
-## 📊 Presentation Materials
+## 📚 Documentation & Resources
 
-**New to NecroStack?** Check out these resources perfect for learning and presenting:
+**New to NecroStack?** Start here:
+- **[GETTING_STARTED.md](GETTING_STARTED.md)** - Your first event pipeline in 10 minutes
+- **[FAQ.md](FAQ.md)** - Frequently asked questions
 
+**For Presentations & Pitches:**
 - **[PITCH.md](PITCH.md)** - Comprehensive pitch deck for presentations
-- **[QUICKSTART.md](QUICKSTART.md)** - 5-minute demo scripts and quick start guide
-- **[SLIDES.md](SLIDES.md)** - Complete slide deck outline for talks
+- **[QUICKSTART.md](QUICKSTART.md)** - 5-minute demo scripts for live demos
+- **[SLIDES.md](SLIDES.md)** - Complete slide deck outline (20+ slides)
 - **[SPEAKER_NOTES.md](SPEAKER_NOTES.md)** - Detailed speaker notes and Q&A prep
-- **[DIAGRAMS.md](DIAGRAMS.md)** - Visual architecture diagrams
+- **[DIAGRAMS.md](DIAGRAMS.md)** - Visual architecture diagrams (ASCII art)
 - **[USE_CASES.md](USE_CASES.md)** - Real-world use cases and patterns
 
 These materials are ideal for:
@@ -18,7 +21,7 @@ These materials are ideal for:
 - Internal team presentations
 - Educational workshops
 - Architecture discussions
-- Learning the framework
+- Self-paced learning
 
 ## Abstract
 
