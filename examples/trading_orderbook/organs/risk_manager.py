@@ -65,42 +65,50 @@ class RiskManager(Organ):
             # Check position limits for buyer
             buyer_value = abs(self.positions[buyer][symbol] * price)
             if buyer_value > MAX_POSITION_VALUE:
-                alerts.append({
-                    "type": "POSITION_LIMIT",
-                    "trader_id": buyer,
-                    "symbol": symbol,
-                    "position_value": buyer_value,
-                    "limit": MAX_POSITION_VALUE,
-                })
+                alerts.append(
+                    {
+                        "type": "POSITION_LIMIT",
+                        "trader_id": buyer,
+                        "symbol": symbol,
+                        "position_value": buyer_value,
+                        "limit": MAX_POSITION_VALUE,
+                    }
+                )
 
             # Check position limits for seller
             seller_value = abs(self.positions[seller][symbol] * price)
             if seller_value > MAX_POSITION_VALUE:
-                alerts.append({
-                    "type": "POSITION_LIMIT",
-                    "trader_id": seller,
-                    "symbol": symbol,
-                    "position_value": seller_value,
-                    "limit": MAX_POSITION_VALUE,
-                })
+                alerts.append(
+                    {
+                        "type": "POSITION_LIMIT",
+                        "trader_id": seller,
+                        "symbol": symbol,
+                        "position_value": seller_value,
+                        "limit": MAX_POSITION_VALUE,
+                    }
+                )
 
             # Check daily volume limits for buyer
             if self.daily_volume[buyer] > MAX_DAILY_VOLUME:
-                alerts.append({
-                    "type": "VOLUME_LIMIT",
-                    "trader_id": buyer,
-                    "daily_volume": self.daily_volume[buyer],
-                    "limit": MAX_DAILY_VOLUME,
-                })
+                alerts.append(
+                    {
+                        "type": "VOLUME_LIMIT",
+                        "trader_id": buyer,
+                        "daily_volume": self.daily_volume[buyer],
+                        "limit": MAX_DAILY_VOLUME,
+                    }
+                )
 
             # Check daily volume limits for seller
             if self.daily_volume[seller] > MAX_DAILY_VOLUME:
-                alerts.append({
-                    "type": "VOLUME_LIMIT",
-                    "trader_id": seller,
-                    "daily_volume": self.daily_volume[seller],
-                    "limit": MAX_DAILY_VOLUME,
-                })
+                alerts.append(
+                    {
+                        "type": "VOLUME_LIMIT",
+                        "trader_id": seller,
+                        "daily_volume": self.daily_volume[seller],
+                        "limit": MAX_DAILY_VOLUME,
+                    }
+                )
 
         elif event.event_type in ("ORDER_FILLED", "ORDER_PARTIAL_FILL"):
             trader = p.get("trader_id", "")
@@ -110,12 +118,14 @@ class RiskManager(Organ):
             self.daily_volume[trader] += qty
 
             if self.daily_volume[trader] > MAX_DAILY_VOLUME:
-                alerts.append({
-                    "type": "VOLUME_LIMIT",
-                    "trader_id": trader,
-                    "daily_volume": self.daily_volume[trader],
-                    "limit": MAX_DAILY_VOLUME,
-                })
+                alerts.append(
+                    {
+                        "type": "VOLUME_LIMIT",
+                        "trader_id": trader,
+                        "daily_volume": self.daily_volume[trader],
+                        "limit": MAX_DAILY_VOLUME,
+                    }
+                )
 
         if alerts:
             self.alerts.extend(alerts)

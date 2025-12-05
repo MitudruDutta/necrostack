@@ -143,6 +143,7 @@ def load_from_file(filepath: str) -> list[dict]:
         return data if isinstance(data, list) else data.get("notifications", [])
     elif path.suffix == ".csv":
         import csv
+
         notifications = []
         with open(path) as f:
             for i, row in enumerate(csv.DictReader(f), start=2):
@@ -165,12 +166,14 @@ def load_from_file(filepath: str) -> list[dict]:
                 priority = row.get("priority", "").strip().lower()
                 if priority not in VALID_PRIORITIES:
                     priority = "normal"
-                notifications.append({
-                    "user_id": user_id,
-                    "channels": channels,
-                    "message": message,
-                    "priority": priority,
-                })
+                notifications.append(
+                    {
+                        "user_id": user_id,
+                        "channels": channels,
+                        "message": message,
+                        "priority": priority,
+                    }
+                )
         return notifications
     else:
         raise ValueError(f"Unsupported format: {path.suffix}")
@@ -233,7 +236,7 @@ def parse_notification_string(s: str) -> dict | None:
             return None
 
         message = "".join(message_chars)
-        remainder = rest[i + 1:].strip()
+        remainder = rest[i + 1 :].strip()
         priority = remainder.lower() if remainder.lower() in VALID_PRIORITIES else "normal"
 
     channels = [c.strip() for c in channels_str.split(",") if c.strip()]

@@ -94,25 +94,53 @@ class MatchingEngine(Organ):
 
         # Input validation
         if quantity <= 0:
-            return [Event(event_type="ORDER_REJECTED", payload={
-                "order_id": order_id, "trader_id": trader_id,
-                "reason": "Invalid quantity", "rejected_at": datetime.now(UTC).isoformat()
-            })]
+            return [
+                Event(
+                    event_type="ORDER_REJECTED",
+                    payload={
+                        "order_id": order_id,
+                        "trader_id": trader_id,
+                        "reason": "Invalid quantity",
+                        "rejected_at": datetime.now(UTC).isoformat(),
+                    },
+                )
+            ]
         if order_type == "LIMIT" and price <= 0:
-            return [Event(event_type="ORDER_REJECTED", payload={
-                "order_id": order_id, "trader_id": trader_id,
-                "reason": "Invalid price", "rejected_at": datetime.now(UTC).isoformat()
-            })]
+            return [
+                Event(
+                    event_type="ORDER_REJECTED",
+                    payload={
+                        "order_id": order_id,
+                        "trader_id": trader_id,
+                        "reason": "Invalid price",
+                        "rejected_at": datetime.now(UTC).isoformat(),
+                    },
+                )
+            ]
         if order_type not in ("LIMIT", "MARKET"):
-            return [Event(event_type="ORDER_REJECTED", payload={
-                "order_id": order_id, "trader_id": trader_id,
-                "reason": "Invalid order type", "rejected_at": datetime.now(UTC).isoformat()
-            })]
+            return [
+                Event(
+                    event_type="ORDER_REJECTED",
+                    payload={
+                        "order_id": order_id,
+                        "trader_id": trader_id,
+                        "reason": "Invalid order type",
+                        "rejected_at": datetime.now(UTC).isoformat(),
+                    },
+                )
+            ]
         if side not in ("BUY", "SELL"):
-            return [Event(event_type="ORDER_REJECTED", payload={
-                "order_id": order_id, "trader_id": trader_id,
-                "reason": "Invalid side", "rejected_at": datetime.now(UTC).isoformat()
-            })]
+            return [
+                Event(
+                    event_type="ORDER_REJECTED",
+                    payload={
+                        "order_id": order_id,
+                        "trader_id": trader_id,
+                        "reason": "Invalid side",
+                        "rejected_at": datetime.now(UTC).isoformat(),
+                    },
+                )
+            ]
 
         book = self._get_book(symbol)
         events: list[Event] = []
@@ -131,28 +159,32 @@ class MatchingEngine(Organ):
                 fill_price = best.price
                 trade_id = f"T{uuid4()}"
 
-                fills.append({
-                    "trade_id": trade_id,
-                    "quantity": fill_qty,
-                    "price": fill_price,
-                    "counterparty_id": best.trader_id,
-                    "counterparty_order": best.order_id,
-                })
-
-                events.append(Event(
-                    event_type="TRADE_EXECUTED",
-                    payload={
+                fills.append(
+                    {
                         "trade_id": trade_id,
-                        "symbol": symbol,
-                        "price": fill_price,
                         "quantity": fill_qty,
-                        "buyer_id": trader_id,
-                        "buyer_order": order_id,
-                        "seller_id": best.trader_id,
-                        "seller_order": best.order_id,
-                        "executed_at": datetime.now(UTC).isoformat(),
-                    },
-                ))
+                        "price": fill_price,
+                        "counterparty_id": best.trader_id,
+                        "counterparty_order": best.order_id,
+                    }
+                )
+
+                events.append(
+                    Event(
+                        event_type="TRADE_EXECUTED",
+                        payload={
+                            "trade_id": trade_id,
+                            "symbol": symbol,
+                            "price": fill_price,
+                            "quantity": fill_qty,
+                            "buyer_id": trader_id,
+                            "buyer_order": order_id,
+                            "seller_id": best.trader_id,
+                            "seller_order": best.order_id,
+                            "executed_at": datetime.now(UTC).isoformat(),
+                        },
+                    )
+                )
 
                 remaining_qty -= fill_qty
                 best.quantity -= fill_qty
@@ -171,28 +203,32 @@ class MatchingEngine(Organ):
                 fill_qty = min(remaining_qty, best.quantity)
                 trade_id = f"T{uuid4()}"
 
-                fills.append({
-                    "trade_id": trade_id,
-                    "quantity": fill_qty,
-                    "price": actual_price,
-                    "counterparty_id": best.trader_id,
-                    "counterparty_order": best.order_id,
-                })
-
-                events.append(Event(
-                    event_type="TRADE_EXECUTED",
-                    payload={
+                fills.append(
+                    {
                         "trade_id": trade_id,
-                        "symbol": symbol,
-                        "price": actual_price,
                         "quantity": fill_qty,
-                        "buyer_id": best.trader_id,
-                        "buyer_order": best.order_id,
-                        "seller_id": trader_id,
-                        "seller_order": order_id,
-                        "executed_at": datetime.now(UTC).isoformat(),
-                    },
-                ))
+                        "price": actual_price,
+                        "counterparty_id": best.trader_id,
+                        "counterparty_order": best.order_id,
+                    }
+                )
+
+                events.append(
+                    Event(
+                        event_type="TRADE_EXECUTED",
+                        payload={
+                            "trade_id": trade_id,
+                            "symbol": symbol,
+                            "price": actual_price,
+                            "quantity": fill_qty,
+                            "buyer_id": best.trader_id,
+                            "buyer_order": best.order_id,
+                            "seller_id": trader_id,
+                            "seller_order": order_id,
+                            "executed_at": datetime.now(UTC).isoformat(),
+                        },
+                    )
+                )
 
                 remaining_qty -= fill_qty
                 best.quantity -= fill_qty
@@ -203,79 +239,91 @@ class MatchingEngine(Organ):
         filled_qty = quantity - remaining_qty
 
         if filled_qty == quantity:
-            events.append(Event(
-                event_type="ORDER_FILLED",
-                payload={
-                    "order_id": order_id,
-                    "trader_id": trader_id,
-                    "symbol": symbol,
-                    "side": side,
-                    "quantity": quantity,
-                    "fills": fills,
-                    "avg_price": sum(f["price"] * f["quantity"] for f in fills) / quantity,
-                    "filled_at": datetime.now(UTC).isoformat(),
-                },
-            ))
-        elif filled_qty > 0:
-            events.append(Event(
-                event_type="ORDER_PARTIAL_FILL",
-                payload={
-                    "order_id": order_id,
-                    "trader_id": trader_id,
-                    "symbol": symbol,
-                    "side": side,
-                    "original_quantity": quantity,
-                    "filled_quantity": filled_qty,
-                    "remaining_quantity": remaining_qty,
-                    "fills": fills,
-                    "filled_at": datetime.now(UTC).isoformat(),
-                },
-            ))
-            if order_type == "LIMIT":
-                book.add_order(OrderEntry(
-                    priority=price if side == "SELL" else -price,
-                    timestamp=datetime.now(UTC).timestamp(),
-                    order_id=order_id,
-                    trader_id=trader_id,
-                    symbol=symbol,
-                    side=side,
-                    quantity=remaining_qty,
-                    price=price,
-                ))
-        else:
-            if order_type == "LIMIT":
-                book.add_order(OrderEntry(
-                    priority=price if side == "SELL" else -price,
-                    timestamp=datetime.now(UTC).timestamp(),
-                    order_id=order_id,
-                    trader_id=trader_id,
-                    symbol=symbol,
-                    side=side,
-                    quantity=quantity,
-                    price=price,
-                ))
-                events.append(Event(
-                    event_type="ORDER_QUEUED",
+            events.append(
+                Event(
+                    event_type="ORDER_FILLED",
                     payload={
                         "order_id": order_id,
                         "trader_id": trader_id,
                         "symbol": symbol,
                         "side": side,
                         "quantity": quantity,
-                        "price": price,
-                        "queued_at": datetime.now(UTC).isoformat(),
+                        "fills": fills,
+                        "avg_price": sum(f["price"] * f["quantity"] for f in fills) / quantity,
+                        "filled_at": datetime.now(UTC).isoformat(),
                     },
-                ))
-            else:
-                events.append(Event(
-                    event_type="ORDER_REJECTED",
+                )
+            )
+        elif filled_qty > 0:
+            events.append(
+                Event(
+                    event_type="ORDER_PARTIAL_FILL",
                     payload={
                         "order_id": order_id,
                         "trader_id": trader_id,
-                        "reason": "No liquidity for MARKET order",
-                        "rejected_at": datetime.now(UTC).isoformat(),
+                        "symbol": symbol,
+                        "side": side,
+                        "original_quantity": quantity,
+                        "filled_quantity": filled_qty,
+                        "remaining_quantity": remaining_qty,
+                        "fills": fills,
+                        "filled_at": datetime.now(UTC).isoformat(),
                     },
-                ))
+                )
+            )
+            if order_type == "LIMIT":
+                book.add_order(
+                    OrderEntry(
+                        priority=price if side == "SELL" else -price,
+                        timestamp=datetime.now(UTC).timestamp(),
+                        order_id=order_id,
+                        trader_id=trader_id,
+                        symbol=symbol,
+                        side=side,
+                        quantity=remaining_qty,
+                        price=price,
+                    )
+                )
+        else:
+            if order_type == "LIMIT":
+                book.add_order(
+                    OrderEntry(
+                        priority=price if side == "SELL" else -price,
+                        timestamp=datetime.now(UTC).timestamp(),
+                        order_id=order_id,
+                        trader_id=trader_id,
+                        symbol=symbol,
+                        side=side,
+                        quantity=quantity,
+                        price=price,
+                    )
+                )
+                events.append(
+                    Event(
+                        event_type="ORDER_QUEUED",
+                        payload={
+                            "order_id": order_id,
+                            "trader_id": trader_id,
+                            "symbol": symbol,
+                            "side": side,
+                            "quantity": quantity,
+                            "price": price,
+                            "queued_at": datetime.now(UTC).isoformat(),
+                        },
+                    )
+                )
+            else:
+                events.append(
+                    Event(
+                        event_type="ORDER_REJECTED",
+                        payload={
+                            "order_id": order_id,
+                            "trader_id": trader_id,
+                            "reason": "No liquidity for MARKET order",
+                            "rejected_at": datetime.now(UTC).isoformat(),
+                        },
+                    )
+                )
 
         return events
 
@@ -289,12 +337,18 @@ class MatchingEngine(Organ):
             return {"bids": [], "asks": []}
         book = cls.books[symbol]
         return {
-            "bids": [(o.price, o.quantity) for o in sorted(
-                [o for o in book._orders.values() if o.side == "BUY"],
-                key=lambda x: (-x.price, x.timestamp)
-            )[:5]],
-            "asks": [(o.price, o.quantity) for o in sorted(
-                [o for o in book._orders.values() if o.side == "SELL"],
-                key=lambda x: (x.price, x.timestamp)
-            )[:5]],
+            "bids": [
+                (o.price, o.quantity)
+                for o in sorted(
+                    [o for o in book._orders.values() if o.side == "BUY"],
+                    key=lambda x: (-x.price, x.timestamp),
+                )[:5]
+            ],
+            "asks": [
+                (o.price, o.quantity)
+                for o in sorted(
+                    [o for o in book._orders.values() if o.side == "SELL"],
+                    key=lambda x: (x.price, x.timestamp),
+                )[:5]
+            ],
         }

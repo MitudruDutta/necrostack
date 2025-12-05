@@ -118,7 +118,7 @@ class AuditTrail(Organ):
                 price = p.get("price", 0)
                 return f"Trade {trade_id}: {qty} {sym} @ {price}"
             case "SETTLEMENT_COMPLETE":
-                total = p.get('total_value', 0.0)
+                total = p.get("total_value", 0.0)
                 return f"Settled {p.get('trade_id', '-')}: ${total:.2f}"
             case "RISK_ALERT":
                 return f"Alerts: {len(p.get('alerts', []))}"

@@ -256,6 +256,7 @@ def load_orders_from_file(filepath: str) -> list[Event]:
         orders = data if isinstance(data, list) else data.get("orders", [])
     elif path.suffix == ".csv":
         import csv
+
         orders = []
         with open(path) as f:
             reader = csv.DictReader(f)
