@@ -72,29 +72,141 @@ def create_sample_orders() -> list[Event]:
     """Create a realistic sequence of orders."""
     orders = [
         # Initial liquidity - limit orders to build the book
-        {"trader_id": "mm_1", "symbol": "AAPL", "side": "BUY", "order_type": "LIMIT", "quantity": 100, "price": 149.50},
-        {"trader_id": "mm_1", "symbol": "AAPL", "side": "BUY", "order_type": "LIMIT", "quantity": 200, "price": 149.00},
-        {"trader_id": "mm_1", "symbol": "AAPL", "side": "SELL", "order_type": "LIMIT", "quantity": 100, "price": 150.50},
-        {"trader_id": "mm_1", "symbol": "AAPL", "side": "SELL", "order_type": "LIMIT", "quantity": 200, "price": 151.00},
+        {
+            "trader_id": "mm_1",
+            "symbol": "AAPL",
+            "side": "BUY",
+            "order_type": "LIMIT",
+            "quantity": 100,
+            "price": 149.50,
+        },
+        {
+            "trader_id": "mm_1",
+            "symbol": "AAPL",
+            "side": "BUY",
+            "order_type": "LIMIT",
+            "quantity": 200,
+            "price": 149.00,
+        },
+        {
+            "trader_id": "mm_1",
+            "symbol": "AAPL",
+            "side": "SELL",
+            "order_type": "LIMIT",
+            "quantity": 100,
+            "price": 150.50,
+        },
+        {
+            "trader_id": "mm_1",
+            "symbol": "AAPL",
+            "side": "SELL",
+            "order_type": "LIMIT",
+            "quantity": 200,
+            "price": 151.00,
+        },
         # Aggressive orders that will match
-        {"trader_id": "trader_1", "symbol": "AAPL", "side": "BUY", "order_type": "MARKET", "quantity": 50, "price": 0},
-        {"trader_id": "trader_2", "symbol": "AAPL", "side": "SELL", "order_type": "MARKET", "quantity": 75, "price": 0},
+        {
+            "trader_id": "trader_1",
+            "symbol": "AAPL",
+            "side": "BUY",
+            "order_type": "MARKET",
+            "quantity": 50,
+            "price": 0,
+        },
+        {
+            "trader_id": "trader_2",
+            "symbol": "AAPL",
+            "side": "SELL",
+            "order_type": "MARKET",
+            "quantity": 75,
+            "price": 0,
+        },
         # Partial fill scenario
-        {"trader_id": "trader_3", "symbol": "AAPL", "side": "BUY", "order_type": "LIMIT", "quantity": 300, "price": 150.75},
+        {
+            "trader_id": "trader_3",
+            "symbol": "AAPL",
+            "side": "BUY",
+            "order_type": "LIMIT",
+            "quantity": 300,
+            "price": 150.75,
+        },
         # Cross-spread order
-        {"trader_id": "trader_4", "symbol": "AAPL", "side": "SELL", "order_type": "LIMIT", "quantity": 150, "price": 149.25},
+        {
+            "trader_id": "trader_4",
+            "symbol": "AAPL",
+            "side": "SELL",
+            "order_type": "LIMIT",
+            "quantity": 150,
+            "price": 149.25,
+        },
         # Invalid orders (will be rejected)
-        {"trader_id": "", "symbol": "AAPL", "side": "BUY", "order_type": "LIMIT", "quantity": 100, "price": 150.00},
-        {"trader_id": "trader_5", "symbol": "INVALID", "side": "BUY", "order_type": "LIMIT", "quantity": 100, "price": 100.00},
-        {"trader_id": "trader_6", "symbol": "AAPL", "side": "BUY", "order_type": "LIMIT", "quantity": -50, "price": 150.00},
+        {
+            "trader_id": "",
+            "symbol": "AAPL",
+            "side": "BUY",
+            "order_type": "LIMIT",
+            "quantity": 100,
+            "price": 150.00,
+        },
+        {
+            "trader_id": "trader_5",
+            "symbol": "INVALID",
+            "side": "BUY",
+            "order_type": "LIMIT",
+            "quantity": 100,
+            "price": 100.00,
+        },
+        {
+            "trader_id": "trader_6",
+            "symbol": "AAPL",
+            "side": "BUY",
+            "order_type": "LIMIT",
+            "quantity": -50,
+            "price": 150.00,
+        },
         # Orders from problematic traders (settlement will fail)
-        {"trader_id": "trader_bad_1", "symbol": "AAPL", "side": "BUY", "order_type": "MARKET", "quantity": 25, "price": 0},
+        {
+            "trader_id": "trader_bad_1",
+            "symbol": "AAPL",
+            "side": "BUY",
+            "order_type": "MARKET",
+            "quantity": 25,
+            "price": 0,
+        },
         # More valid orders
-        {"trader_id": "trader_7", "symbol": "GOOGL", "side": "BUY", "order_type": "LIMIT", "quantity": 50, "price": 140.00},
-        {"trader_id": "trader_8", "symbol": "GOOGL", "side": "SELL", "order_type": "LIMIT", "quantity": 50, "price": 140.00},
+        {
+            "trader_id": "trader_7",
+            "symbol": "GOOGL",
+            "side": "BUY",
+            "order_type": "LIMIT",
+            "quantity": 50,
+            "price": 140.00,
+        },
+        {
+            "trader_id": "trader_8",
+            "symbol": "GOOGL",
+            "side": "SELL",
+            "order_type": "LIMIT",
+            "quantity": 50,
+            "price": 140.00,
+        },
         # Large order to trigger risk alert
-        {"trader_id": "whale_1", "symbol": "TSLA", "side": "BUY", "order_type": "LIMIT", "quantity": 5000, "price": 250.00},
-        {"trader_id": "whale_2", "symbol": "TSLA", "side": "SELL", "order_type": "LIMIT", "quantity": 5000, "price": 250.00},
+        {
+            "trader_id": "whale_1",
+            "symbol": "TSLA",
+            "side": "BUY",
+            "order_type": "LIMIT",
+            "quantity": 5000,
+            "price": 250.00,
+        },
+        {
+            "trader_id": "whale_2",
+            "symbol": "TSLA",
+            "side": "SELL",
+            "order_type": "LIMIT",
+            "quantity": 5000,
+            "price": 250.00,
+        },
     ]
     return [Event(event_type="ORDER_SUBMITTED", payload=o) for o in orders]
 
@@ -107,7 +219,15 @@ def create_stress_orders(count: int) -> list[Event]:
     orders = []
     for _ in range(count):
         symbol = random.choice(symbols)
-        base_price = {"AAPL": 150, "GOOGL": 140, "MSFT": 380, "AMZN": 180, "TSLA": 250, "NVDA": 480, "META": 500}[symbol]
+        base_price = {
+            "AAPL": 150,
+            "GOOGL": 140,
+            "MSFT": 380,
+            "AMZN": 180,
+            "TSLA": 250,
+            "NVDA": 480,
+            "META": 500,
+        }[symbol]
 
         order = {
             "trader_id": random.choice(traders),
@@ -237,7 +357,8 @@ async def run_trading_system(orders: list[Event], verbose: bool = True):
         await backend.enqueue(order)
         if verbose and len(orders) <= 20:
             p = order.payload
-            print(f"  → {p['trader_id']}: {p['side']} {p['quantity']} {p['symbol']} @ {p.get('price') or 'MKT'}")
+            price_str = p.get("price") or "MKT"
+            print(f"  → {p['trader_id']}: {p['side']} {p['quantity']} {p['symbol']} @ {price_str}")
 
     if verbose:
         print("\nProcessing orders...\n")
@@ -305,8 +426,12 @@ def main():
     parser.add_argument("--orders", type=int, default=500, help="Number of orders for stress test")
     parser.add_argument("--quiet", action="store_true", help="Minimal output")
     parser.add_argument("--file", type=str, help="Load orders from JSON/CSV file")
-    parser.add_argument("--interactive", "-i", action="store_true", help="Interactive order entry mode")
-    parser.add_argument("--trader", type=str, default="trader_cli", help="Trader ID for interactive mode")
+    parser.add_argument(
+        "--interactive", "-i", action="store_true", help="Interactive order entry mode"
+    )
+    parser.add_argument(
+        "--trader", type=str, default="trader_cli", help="Trader ID for interactive mode"
+    )
     args = parser.parse_args()
 
     if args.interactive:
@@ -366,7 +491,8 @@ async def run_interactive_mode(trader_id: str):
         while True:
             # Use asyncio-friendly input
             try:
-                user_input = await asyncio.get_event_loop().run_in_executor(None, lambda: input("\n> ").strip())
+                loop = asyncio.get_event_loop()
+                user_input = await loop.run_in_executor(None, lambda: input("\n> ").strip())
             except (EOFError, KeyboardInterrupt):
                 print("\nExiting...")
                 break
@@ -400,7 +526,11 @@ async def run_interactive_mode(trader_id: str):
                 if order:
                     event = Event(event_type="ORDER_SUBMITTED", payload=order)
                     await backend.enqueue(event)
-                    print(f"  ✓ Submitted: {order['side']} {order['quantity']} {order['symbol']} @ {order['price'] or 'MKT'}")
+                    price_str = order["price"] or "MKT"
+                    side = order["side"]
+                    qty = order["quantity"]
+                    sym = order["symbol"]
+                    print(f"  ✓ Submitted: {side} {qty} {sym} @ {price_str}")
                     await asyncio.sleep(0.5)  # Allow spine to process
                 else:
                     print("  ✗ Invalid format. Use: BUY 100 AAPL @ 150.50 or SELL 50 TSLA MKT")

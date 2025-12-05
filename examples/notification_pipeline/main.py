@@ -70,20 +70,55 @@ def create_sample_notifications() -> list[dict]:
     ts = datetime.now().strftime("%H:%M:%S")
 
     return [
-        {"user_id": "user_001", "channels": ["email", "sms", "push"], "message": f"Order #{order_id} shipped! [{ts}]", "priority": "high"},
-        {"user_id": "user_002", "channels": ["email"], "message": f"Weekly digest: {random.randint(1,20)} updates", "priority": "low"},
-        {"user_id": "user_003", "channels": ["sms", "push"], "message": f"Security alert at {ts}", "priority": "critical"},
+        {
+            "user_id": "user_001",
+            "channels": ["email", "sms", "push"],
+            "message": f"Order #{order_id} shipped! [{ts}]",
+            "priority": "high",
+        },
+        {
+            "user_id": "user_002",
+            "channels": ["email"],
+            "message": f"Weekly digest: {random.randint(1,20)} updates",
+            "priority": "low",
+        },
+        {
+            "user_id": "user_003",
+            "channels": ["sms", "push"],
+            "message": f"Security alert at {ts}",
+            "priority": "critical",
+        },
         {"user_id": "user_001", "channels": ["email"], "message": "", "priority": "normal"},
-        {"user_id": "user_002", "channels": ["telegram"], "message": "Test", "priority": "normal"},
+        {
+            "user_id": "user_002",
+            "channels": ["telegram"],
+            "message": "Test",
+            "priority": "normal",
+        },
     ]
 
 
 def create_stress_notifications(count: int) -> list[dict]:
     """Generate random notifications for stress testing."""
     users = ["user_001", "user_002", "user_003"] + [f"user_{i:03d}" for i in range(4, 20)]
-    channels_options = [["email"], ["sms"], ["push"], ["email", "sms"], ["email", "push"], ["sms", "push"], ["email", "sms", "push"]]
+    channels_options = [
+        ["email"],
+        ["sms"],
+        ["push"],
+        ["email", "sms"],
+        ["email", "push"],
+        ["sms", "push"],
+        ["email", "sms", "push"],
+    ]
     priorities = ["low", "normal", "high", "critical"]
-    messages = ["Order update", "Security alert", "Weekly digest", "Payment received", "Shipping update", "Account notice"]
+    messages = [
+        "Order update",
+        "Security alert",
+        "Weekly digest",
+        "Payment received",
+        "Shipping update",
+        "Account notice",
+    ]
 
     return [
         {
@@ -143,7 +178,7 @@ def load_from_file(filepath: str) -> list[dict]:
 
 def parse_notification_string(s: str) -> dict | None:
     """Parse: user_001 email,sms 'Your message here' high
-    
+
     Requires quoted messages for multi-word content.
     """
     s = s.strip()
@@ -321,7 +356,9 @@ def main():
     parser.add_argument("--file", "-f", type=str, help="Load from JSON/CSV file")
     parser.add_argument("--interactive", "-i", action="store_true", help="Interactive mode")
     parser.add_argument("--stress", action="store_true", help="Stress test mode")
-    parser.add_argument("--count", type=int, default=100, help="Number of notifications for stress test")
+    parser.add_argument(
+        "--count", type=int, default=100, help="Number of notifications for stress test"
+    )
     parser.add_argument("--quiet", "-q", action="store_true", help="Minimal output")
     args = parser.parse_args()
 

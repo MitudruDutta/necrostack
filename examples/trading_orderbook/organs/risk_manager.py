@@ -46,7 +46,8 @@ class RiskManager(Organ):
 
             # Validate required fields
             if buyer is None or seller is None or symbol is None:
-                missing = [k for k, v in [("buyer_id", buyer), ("seller_id", seller), ("symbol", symbol)] if v is None]
+                fields = [("buyer_id", buyer), ("seller_id", seller), ("symbol", symbol)]
+                missing = [k for k, v in fields if v is None]
                 logger.warning("Skipping SETTLEMENT_COMPLETE with missing fields: %s", missing)
                 return None
             if not isinstance(qty, (int, float)) or qty <= 0:
@@ -103,7 +104,9 @@ class RiskManager(Organ):
 
         elif event.event_type in ("ORDER_FILLED", "ORDER_PARTIAL_FILL"):
             trader = p.get("trader_id", "")
-            qty = p.get("quantity") if p.get("quantity") is not None else p.get("filled_quantity", 0)
+            qty = p.get("quantity")
+            if qty is None:
+                qty = p.get("filled_quantity", 0)
             self.daily_volume[trader] += qty
 
             if self.daily_volume[trader] > MAX_DAILY_VOLUME:

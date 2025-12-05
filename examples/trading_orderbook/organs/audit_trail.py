@@ -51,7 +51,12 @@ class AuditTrail(Organ):
         except Exception as e:
             event_id = getattr(event, "id", None)
             raw_ts = getattr(event, "timestamp", None)
-            ts_str = raw_ts.isoformat() if hasattr(raw_ts, "isoformat") else str(raw_ts) if raw_ts else "unknown"
+            if hasattr(raw_ts, "isoformat"):
+                ts_str = raw_ts.isoformat()
+            elif raw_ts:
+                ts_str = str(raw_ts)
+            else:
+                ts_str = "unknown"
             record = {
                 "event_id": event_id,
                 "event_type": getattr(event, "event_type", "unknown"),
@@ -85,18 +90,33 @@ class AuditTrail(Organ):
         p = event.payload
         match event.event_type:
             case "ORDER_VALIDATED":
-                return f"{p.get('side', '?')} {p.get('quantity', 0)} {p.get('symbol', '?')} @ {p.get('price', 'MKT')}"
+                side = p.get("side", "?")
+                qty = p.get("quantity", 0)
+                sym = p.get("symbol", "?")
+                price = p.get("price", "MKT")
+                return f"{side} {qty} {sym} @ {price}"
             case "ORDER_REJECTED":
                 return f"Rejected: {p.get('reason', 'unknown')}"
             case "ORDER_FILLED":
-                avg_price = p.get('avg_price', 0.0)
+                avg_price = p.get("avg_price", 0.0)
                 return f"Filled {p.get('quantity', 0)} {p.get('symbol', '?')} @ {avg_price:.2f}"
             case "ORDER_PARTIAL_FILL":
-                return f"Partial {p.get('filled_quantity', 0)}/{p.get('original_quantity', 0)} {p.get('symbol', '?')}"
+                filled = p.get("filled_quantity", 0)
+                orig = p.get("original_quantity", 0)
+                sym = p.get("symbol", "?")
+                return f"Partial {filled}/{orig} {sym}"
             case "ORDER_QUEUED":
-                return f"Queued {p.get('side', '?')} {p.get('quantity', 0)} {p.get('symbol', '?')} @ {p.get('price', 'MKT')}"
+                side = p.get("side", "?")
+                qty = p.get("quantity", 0)
+                sym = p.get("symbol", "?")
+                price = p.get("price", "MKT")
+                return f"Queued {side} {qty} {sym} @ {price}"
             case "TRADE_EXECUTED":
-                return f"Trade {p.get('trade_id', '-')}: {p.get('quantity', 0)} {p.get('symbol', '?')} @ {p.get('price', 0)}"
+                trade_id = p.get("trade_id", "-")
+                qty = p.get("quantity", 0)
+                sym = p.get("symbol", "?")
+                price = p.get("price", 0)
+                return f"Trade {trade_id}: {qty} {sym} @ {price}"
             case "SETTLEMENT_COMPLETE":
                 total = p.get('total_value', 0.0)
                 return f"Settled {p.get('trade_id', '-')}: ${total:.2f}"
